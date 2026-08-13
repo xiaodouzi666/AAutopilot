@@ -28,4 +28,4 @@ approve a measured multi-runtime profile.
 - No energy or cloud-cost claim is made without a credible counter or supplied price.
 - Fixture responses are excluded from every performance claim.
 
-Generated at 2026-08-13T22:54:36.429829+00:00. See `claims.json`, `benchmark-results.json`, and `raw/` for provenance.
+Generated at 2026-08-13T23:00:57.375499+00:00. See `claims.json`, `benchmark-results.json`, and `raw/` for provenance.

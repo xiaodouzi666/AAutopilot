@@ -29,7 +29,7 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
   demo receipt, final video, redaction, provenance attestation, and 90-day artifacts.
 - [x] Devpost write-up template, compliance checklist, thumbnail, target-bound video renderer, and
   a clearly watermarked non-publishable local draft.
-- [x] Local source suite: 182 tests plus Ruff, formatting, shell syntax, workflow YAML, wheel, data,
+- [x] Local source suite: 183 tests plus Ruff, formatting, shell syntax, workflow YAML, wheel, data,
   fixture, secret/redaction, and fail-closed media checks.
 
 ## Publication status

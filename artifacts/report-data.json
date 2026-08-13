@@ -3,7 +3,7 @@
   "claims": [],
   "evidence_status": "measurement-pending",
   "fixture_count": 0,
-  "generated_at": "2026-08-13T22:54:36.429829+00:00",
+  "generated_at": "2026-08-13T23:00:57.375499+00:00",
   "limitations": [
     "Results apply only to the recorded target, model files, runtime commit, and workload.",
     "The synthetic incident suite is not a general LLM capability benchmark.",
