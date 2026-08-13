@@ -1,0 +1,32 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+htmlcov/
+
+# Native builds and downloaded third-party sources/models
+/build/
+/third_party/llama.cpp/
+/models/
+*.gguf
+*.bin
+
+# Generated runtime data. Curated public evidence is force-added deliberately.
+/artifacts/raw/
+/artifacts/runtime/
+/artifacts/tmp/
+/artifacts/*.log
+/artifacts/submission/*-DRAFT.*
+
+# Local/private target configuration
+/.a64pilot/
+*.pem
+id_rsa*

@@ -1,0 +1,1 @@
+schema_version,run_id,candidate_id,stage,case_id,repetition,split,backend,model_role,model_file_sha256,quantization,threads,batch,ubatch,parallel,context,affinity,cpu_only_verified,kleidiai_verified,evidence_kind,start_ns,first_token_ns,end_ns,ttft_ms,e2e_ms,prompt_tokens,completion_tokens,generation_tok_s,peak_rss_mb,route,schema_valid,quality_score,safety_score,command,errors

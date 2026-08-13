@@ -1,0 +1,9 @@
+{
+  "fixture_version": "1.0",
+  "synthetic": true,
+  "targets": {
+    "inventory-service": {"reachable": false, "error": "connection refused"},
+    "pricing-service": {"reachable": false, "error": "dns servfail"},
+    "checkout-api": {"reachable": true, "latency_ms": 4}
+  }
+}

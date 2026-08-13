@@ -1,0 +1,7 @@
+processor	: 0
+model name	: ARM Neoverse-V2
+Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp sve i8mm bf16 sve2
+
+processor	: 1
+model name	: ARM Neoverse-V2
+Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp sve i8mm bf16 sve2

@@ -1,0 +1,9 @@
+{
+  "fixture_version": "1.0",
+  "synthetic": true,
+  "entries": [
+    {"service": "catalog-api", "level": "ERROR", "message": "configuration parser exception"},
+    {"service": "image-api", "level": "ERROR", "message": "write failed: no space left on device"},
+    {"service": "checkout-api", "level": "WARN", "message": "upstream cart-db request timed out"}
+  ]
+}

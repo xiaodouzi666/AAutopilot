@@ -1,0 +1,42 @@
+# AArch64 Autopilot Evidence Report
+
+**Evidence status:** {% if evidence_status == "measured" %}measured ({{ measurement_count }} raw request rows){% else %}Arm64 measurement pending; fixture output is excluded from claims{% endif %}.
+
+## Headline claims
+
+{% if claims %}
+{% for claim in claims %}
+- **{{ claim.metric }}:** {{ "%.3f"|format(claim.value) }}{{ claim.unit }}; 95% bootstrap interval {{ "%.3f"|format(claim.confidence_interval[0]) }} to {{ "%.3f"|format(claim.confidence_interval[1]) }}{{ claim.unit }}. {% if claim.demonstrated %}The interval excludes zero.{% else %}This is reported as no demonstrated improvement because the interval crosses zero.{% endif %}
+  - Baseline: `{{ claim.baseline_candidate }}`
+  - Optimized: `{{ claim.optimized_candidate }}`
+  - Formula: `{{ claim.formula }}`
+  - Source run IDs: {{ claim.source_rows|join(", ") }}
+{% endfor %}
+{% else %}
+No performance claim is available. Complete the fair same-machine Arm64 Linux generic-Q4_0/KleidiAI-Q4_0 benchmark first.
+{% endif %}
+
+## Candidate summary
+
+| Candidate | Stage | Backend | n | p50 ms | p95 ms | Quality | Safety | Peak RSS MB |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+{% for row in summaries %}| {{ row.candidate_id }} | {{ row.stage }} | {{ row.backend }} | {{ row.sample_count }} | {{ "%.2f"|format(row.p50_latency_ms) }} | {{ "%.2f"|format(row.p95_latency_ms) }} | {{ "%.2f"|format(row.quality_score) }} | {{ "%.2f"|format(row.safety_score) }} | {{ "%.1f"|format(row.peak_rss_mb) }} |
+{% endfor %}
+{% if not summaries %}| _none_ | measurement pending | — | 0 | — | — | — | — | — |
+{% endif %}
+
+## Evidence contract
+
+The fair Arm-specific comparison holds the target, source commit, official Q4_0 model checksum, prompt set, sampling, affinity, threads, batch, micro-batch, concurrency, and lifecycle constant. The intended variable is only the generic versus KleidiAI CPU backend. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K `output.weight`; that single fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. CPU-only proof and the primary KleidiAI Q4 marker are required, and any additional or different fallback is rejected.
+
+The submitted API profile is strong-only. Its public boundary applies constrained triage JSON and
+fails closed when schema, read-only tool policy, safety, or consistency validation fails. A4
+weak/strong routing remains a future experiment unless calibration and the complete held-out gate
+approve a measured multi-runtime profile.
+
+## Limitations
+
+{% for limitation in limitations %}- {{ limitation }}
+{% endfor %}
+
+Generated at {{ generated_at }}. See `claims.json`, `benchmark-results.json`, and `raw/` for provenance.

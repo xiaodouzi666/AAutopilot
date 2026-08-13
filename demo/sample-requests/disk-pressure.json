@@ -1,0 +1,12 @@
+{
+  "model": "a64pilot-triage",
+  "messages": [
+    {
+      "role": "user",
+      "content": "The image-api reports 507 errors. Its /srv filesystem is 99% full while memory and network checks are normal."
+    }
+  ],
+  "temperature": 0.0,
+  "max_tokens": 192,
+  "stream": false
+}

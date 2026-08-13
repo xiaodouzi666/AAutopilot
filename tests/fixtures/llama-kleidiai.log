@@ -1,0 +1,5 @@
+build: 9999 (01234567) with GNU 13.2.0 for Linux aarch64
+main: llama backend init
+kleidiai: primary q4 kernel feature dotprod
+load_tensors: CPU_KLEIDIAI model buffer size = 934.62 MiB
+llama_model_loader: loaded meta data with 0 GPU layers

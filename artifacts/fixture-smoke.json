@@ -1,0 +1,48 @@
+{
+  "debug": {
+    "x-a64pilot-backend": "none",
+    "x-a64pilot-cpu-only-verified": "false",
+    "x-a64pilot-escalated": "false",
+    "x-a64pilot-evidence-mode": "fixture_not_benchmark_evidence",
+    "x-a64pilot-output-validation": "schema_safety_consistency_passed",
+    "x-a64pilot-profile": "fixture-demo",
+    "x-a64pilot-route": "fixture",
+    "x-a64pilot-selected-model": "a64pilot-fixture-not-for-benchmark"
+  },
+  "health": {
+    "benchmark_evidence": false,
+    "message": "Fixture mode is for tests/screenshots and is not performance evidence.",
+    "mode": "fixture_not_model_inference",
+    "ready": true,
+    "status": "fixture"
+  },
+  "mode": "fixture_not_benchmark_evidence",
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\"summary\":\"Fixture-only triage result derived from the supplied synthetic incident text.\",\"severity\":\"medium\",\"diagnosis\":\"unknown\",\"hypotheses\":[{\"cause\":\"unknown\",\"evidence\":[\"keyword match in synthetic request\"],\"confidence\":0.5}],\"tool_calls\":[{\"name\":\"escalate\",\"arguments\":{\"reason\":\"insufficient evidence\"}}],\"safe_next_action\":\"Inspect the read-only fixture evidence and escalate if it is inconclusive.\",\"needs_escalation\":true}",
+          "role": "assistant"
+        }
+      }
+    ],
+    "created": 1786661705,
+    "id": "chatcmpl-57538042fbae4cfda5f8defcd15536cc",
+    "model": "a64pilot-fixture-not-for-benchmark",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 0,
+      "prompt_tokens": 0,
+      "total_tokens": 0
+    }
+  },
+  "validation": {
+    "internally_consistent": true,
+    "issues": [],
+    "safety_compliant": true,
+    "schema_valid": true,
+    "valid": true
+  }
+}

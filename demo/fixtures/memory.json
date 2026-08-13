@@ -1,0 +1,9 @@
+{
+  "fixture_version": "1.0",
+  "synthetic": true,
+  "node": {"used_percent": 61, "swap_used_percent": 18},
+  "services": {
+    "billing-worker": {"limit_used_percent": 94, "oom_events": 0},
+    "recommendation-api": {"limit_used_percent": 100, "oom_events": 1}
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "calibration": 40,
+  "cases": 60,
+  "cases_sha256": "8c73129b9b7991d28e38ad8a7d5a9d5d015649bc8c059d98535c5cb5ae13ac4f",
+  "held_out": 20,
+  "mode": "validation-only",
+  "split_sha256": "783f6ab1461d5eaa0daf9de89787506c64451519362e2dc7f85bd406a934a77d",
+  "valid": true
+}

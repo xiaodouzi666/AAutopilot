@@ -1,0 +1,9 @@
+hw.machine: arm64
+machdep.cpu.brand_string: Apple M4
+hw.optional.arm.FEAT_DotProd: 1
+hw.optional.arm.FEAT_I8MM: 1
+hw.optional.arm.FEAT_BF16: 1
+hw.optional.arm.FEAT_SVE: 0
+hw.optional.arm.FEAT_SVE2: 0
+hw.optional.arm.FEAT_SME: 1
+hw.optional.arm.FEAT_SME2: 1

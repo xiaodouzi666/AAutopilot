@@ -1,0 +1,279 @@
+{
+  "build": null,
+  "claims": [],
+  "evidence_status": "measurement-pending",
+  "fixture_count": 0,
+  "generated_at": "2026-08-13T22:54:36.429829+00:00",
+  "limitations": [
+    "Results apply only to the recorded target, model files, runtime commit, and workload.",
+    "The synthetic incident suite is not a general LLM capability benchmark.",
+    "No energy or cloud-cost claim is made without a credible counter or supplied price.",
+    "Fixture responses are excluded from every performance claim."
+  ],
+  "measurement_count": 0,
+  "models": null,
+  "summaries": [],
+  "system": {
+    "affinity_candidates": {
+      "all_allowed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ]
+    },
+    "architecture": "aarch64",
+    "architecture_raw": "arm64",
+    "arm64": true,
+    "collected_at": "2026-08-13T22:05:41.205203Z",
+    "cpu_model": "Apple M4 Pro",
+    "features": {
+      "bf16": {
+        "evidence": [
+          "sysctl: hw.optional.arm.FEAT_BF16=1"
+        ],
+        "supported": true
+      },
+      "dotprod": {
+        "evidence": [
+          "sysctl: hw.optional.arm.FEAT_DotProd=1"
+        ],
+        "supported": true
+      },
+      "fp16": {
+        "evidence": [
+          "sysctl: hw.optional.arm.FEAT_FP16=1",
+          "sysctl: hw.optional.armv8_2_fhm=1"
+        ],
+        "supported": true
+      },
+      "i8mm": {
+        "evidence": [
+          "sysctl: hw.optional.arm.FEAT_I8MM=1"
+        ],
+        "supported": true
+      },
+      "sme": {
+        "evidence": [
+          "sysctl: hw.optional.arm.FEAT_SME=1"
+        ],
+        "supported": true
+      },
+      "sme2": {
+        "evidence": [
+          "sysctl: hw.optional.arm.FEAT_SME2=1"
+        ],
+        "supported": true
+      },
+      "sve": {
+        "evidence": [],
+        "supported": false
+      },
+      "sve2": {
+        "evidence": [],
+        "supported": false
+      }
+    },
+    "filesystem_free_bytes": 14374121472,
+    "kernel": "25.5.0",
+    "limitations": [
+      "macOS does not expose Linux-style CPU affinity",
+      "final service benchmark mode requires Linux on Arm64"
+    ],
+    "logical_cores": 14,
+    "memory_bytes": 25769803776,
+    "operating_system": "Darwin",
+    "physical_cores": 14,
+    "public_redacted": true,
+    "python_version": "3.11.12",
+    "real_benchmark_eligible": false,
+    "schema_version": "1.0.0",
+    "sources": [
+      "platform",
+      "uname",
+      "sysctl hw.logicalcpu/hw.physicalcpu",
+      "sysctl hw.memsize",
+      "sysctl machdep.cpu.brand_string",
+      "filesystem stat"
+    ],
+    "tool_versions": {
+      "cmake": null,
+      "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+      "python": "3.11.12 (main, Apr  9 2025, 03:49:53) [Clang 20.1.0 ]"
+    },
+    "topology": {
+      "affinity_candidates": [
+        {
+          "cpus": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "evidence": [
+            "OS allowed CPU set"
+          ],
+          "name": "all_allowed"
+        }
+      ],
+      "allowed_cpus": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "cores": [
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 0,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 1,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 2,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 3,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 4,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 5,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 6,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 7,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 8,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 9,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 10,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 11,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 12,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        },
+        {
+          "capacity": null,
+          "core_id": null,
+          "cpu_id": 13,
+          "max_frequency_khz": null,
+          "numa_node": null,
+          "package_id": null
+        }
+      ],
+      "limitations": [
+        "macOS does not expose Linux-style CPU affinity"
+      ],
+      "logical_cpus": 14,
+      "physical_cores": 14,
+      "sources": [
+        "sysctl hw.logicalcpu/hw.physicalcpu"
+      ]
+    }
+  }
+}

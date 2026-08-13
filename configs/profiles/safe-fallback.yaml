@@ -1,0 +1,13 @@
+profile_id: safe-strong-only
+status: unmeasured-fallback
+backend: generic
+model_role: strong
+quantization: Q4_0
+cpu_only: true
+gpu_layers: 0
+router:
+  mode: strong_only
+notes:
+  - This profile is configuration-only and carries no performance claim.
+  - Q4_0 is selected for compatibility with the pinned KleidiAI Q4 kernel path.
+  - Run the benchmark pipeline on Arm64 Linux before using it as evidence.

@@ -1,0 +1,183 @@
+name: Arm64 evidence pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      repetitions:
+        description: Repetitions per held-out case
+        required: true
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "artifacts/**"
+      - "**/*.md"
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: arm64-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arm64-evidence:
+    # GitHub's official runner reference lists ubuntu-24.04-arm as the standard
+    # Arm64 Linux label for public repositories:
+    # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    env:
+      A64PILOT_CI: "1"
+      BENCHMARK_REPETITIONS: ${{ inputs.repetitions || '1' }}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_DISABLE_XET: "1"
+      MPLBACKEND: Agg
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Check out the exact repository revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Assert the evidence target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(uname -s)" = Linux
+          case "$(uname -m)" in
+            aarch64|arm64) ;;
+            *) printf 'Expected Arm64 runner, found %s\n' "$(uname -m)" >&2; exit 2 ;;
+          esac
+          lscpu
+          df -h .
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6 peeled commit
+        with:
+          version: "0.8.11"
+          enable-cache: false
+
+      - name: Install native dependencies
+        run: scripts/install-system-deps.sh
+
+      - name: Sync locked Python environment
+        run: uv sync --frozen --extra dev --no-editable --reinstall-package aarch64-autopilot
+
+      - name: Record target provenance
+        run: make doctor
+
+      - name: Run source, schema, quality-data, and fixture gates
+        run: make verify-source
+
+      - name: Build same-commit generic and KleidiAI CPU backends
+        run: make build JOBS=4
+
+      - name: Download and verify the minimum official model set
+        run: |
+          make models MODEL_FLAGS=--minimum
+          make verify-models
+          df -h .
+
+      - name: Run a real dual-backend smoke case
+        # `benchmark fair --limit 1` records split=micro, so it cannot be
+        # mixed into the complete 20-case held-out A1/A2 claim below.
+        run: make smoke
+
+      - name: Run the bounded real benchmark
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          case "$BENCHMARK_REPETITIONS" in
+            1|2|3) ;;
+            *) printf 'Invalid repetition count: %s\n' "$BENCHMARK_REPETITIONS" >&2; exit 2 ;;
+          esac
+          uv run --frozen --no-editable a64pilot benchmark all \
+            --quick \
+            --repetitions "$BENCHMARK_REPETITIONS"
+
+      - name: Select only quality-feasible measured rows
+        run: make select
+
+      - name: Render the strict report and Devpost materials
+        run: |
+          make report
+          make submission
+
+      - name: Run full backend, claim, provenance, and source verification
+        run: make verify
+
+      - name: Capture validated target-device demo receipt
+        run: uv run --frozen --no-editable python scripts/capture-arm-target-demo.py
+
+      - name: Render target-device demo video from validated evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get install -y --no-install-recommends ffmpeg imagemagick fonts-dejavu-core
+          uv run --frozen --no-editable python scripts/render-demo-video.py
+
+      - name: Build a sanitized public evidence bundle
+        if: always()
+        run: uv run --frozen --no-editable python scripts/redact-artifacts.py --output artifacts-public artifacts
+
+      - name: Verify the sanitized bundle is clean
+        if: always()
+        run: uv run --frozen --no-editable python scripts/redact-artifacts.py --check artifacts-public
+
+      - name: Package the verified public evidence
+        if: success()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -czf aarch64-autopilot-evidence.tar.gz -C artifacts-public .
+          sha256sum aarch64-autopilot-evidence.tar.gz | tee evidence-bundle.sha256
+
+      - name: Sign the Arm64 evidence provenance
+        if: success()
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: aarch64-autopilot-evidence.tar.gz
+
+      - name: Add report to the workflow summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f artifacts-public/report.md ]]; then
+            cat artifacts-public/report.md >>"$GITHUB_STEP_SUMMARY"
+          else
+            printf 'Arm64 evidence pipeline did not reach report generation.\n' >>"$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload sanitized evidence without writing back to Git
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aarch64-autopilot-arm64-${{ github.run_id }}
+          path: artifacts-public/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 6
+
+      - name: Upload the signed evidence subject
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aarch64-autopilot-attested-evidence-${{ github.run_id }}
+          path: |
+            aarch64-autopilot-evidence.tar.gz
+            evidence-bundle.sha256
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0

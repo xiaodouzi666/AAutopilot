@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AArch64 Autopilot — Evidence Report</title>
+  <style>
+    :root { --bg:#050b14; --panel:#0b1728; --line:#21334a; --text:#f8fafc; --muted:#9fb0c5; --mint:#3ddc97; --cyan:#38bdf8; --amber:#fbbf24; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--text); background:radial-gradient(circle at 84% 0,#12304d 0,transparent 30%),var(--bg); font:16px/1.55 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1180px,calc(100% - 40px)); margin:auto; padding:48px 0 80px; }
+    header { display:grid; grid-template-columns:1.35fr .65fr; gap:28px; align-items:end; padding:32px 0 38px; }
+    .eyebrow { color:var(--mint); letter-spacing:.16em; text-transform:uppercase; font-size:.78rem; font-weight:800; }
+    h1 { font-size:clamp(2.6rem,6vw,5.8rem); line-height:.94; letter-spacing:-.055em; margin:.25em 0; max-width:900px; }
+    h2 { font-size:1.55rem; letter-spacing:-.02em; margin:0 0 18px; }
+    p { color:var(--muted); }
+    .status { border:1px solid var(--line); background:rgba(11,23,40,.84); padding:22px; border-radius:18px; }
+    .status strong { color:var(--amber); display:block; font-size:1.2rem; }
+    .badges { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+    .badge { padding:8px 11px; border:1px solid var(--line); border-radius:999px; color:#dbeafe; background:#07111f; font-size:.82rem; }
+    .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:18px; margin:18px 0; }
+    .card { grid-column:span 4; border:1px solid var(--line); border-radius:18px; padding:22px; background:linear-gradient(145deg,rgba(16,34,56,.92),rgba(8,19,34,.95)); min-height:155px; }
+    .card.wide { grid-column:span 6; }
+    .metric { font-size:2rem; font-weight:800; letter-spacing:-.035em; color:var(--mint); }
+    .metric small { font-size:.8rem; color:var(--muted); display:block; letter-spacing:0; font-weight:500; }
+    table { width:100%; border-collapse:collapse; background:var(--panel); border-radius:16px; overflow:hidden; }
+    th,td { text-align:left; border-bottom:1px solid var(--line); padding:13px 15px; }
+    th { color:#cbd5e1; font-size:.76rem; text-transform:uppercase; letter-spacing:.08em; }
+    td { color:var(--muted); }
+    .figure { width:100%; border:1px solid var(--line); border-radius:18px; display:block; }
+    code { color:#bae6fd; }
+    footer { border-top:1px solid var(--line); margin-top:42px; padding-top:24px; color:var(--muted); font-size:.88rem; }
+    @media(max-width:800px){header{grid-template-columns:1fr}.card,.card.wide{grid-column:span 12}}
+  </style>
+</head>
+<body><main>
+  <header>
+    <div>
+      <div class="eyebrow">CPU-only Arm AI optimization</div>
+      <h1>AArch64<br>Autopilot</h1>
+      <p>A bounded tuner, quality gate, OpenAI-compatible endpoint, and claim-level evidence pipeline for agentic inference on Arm64 CPUs.</p>
+      <div class="badges"><span class="badge">GPU: NONE</span><span class="badge">QUALITY-GATED</span><span class="badge">RAW EVIDENCE</span><span class="badge">OPEN SOURCE</span></div>
+    </div>
+    <div class="status">
+      <strong>ARM64 MEASUREMENT PENDING</strong>
+      <p>No performance number is published until the fair generic/KleidiAI run finishes on Arm64 Linux. 0 fixture rows remain excluded.</p>
+    </div>
+  </header>
+
+  <section class="grid">
+      <article class="card"><div class="metric">0<small>fabricated benchmark claims</small></div><p>The report fails closed when target evidence is absent.</p></article>
+    <article class="card"><div class="metric">100%<small>required safety floor</small></div><p>The submitted strong-only proxy validates schema, read-only tool policy, safety, and consistency; invalid output fails closed with HTTP 502.</p></article>
+    <article class="card"><div class="metric">40 / 20<small>calibration / held-out cases</small></div><p>Tuning decisions freeze before final labels are evaluated. A4 routing remains a future experiment unless its gate passes.</p></article>
+  </section>
+
+  <section><h2>Measured candidates</h2>
+    <table><thead><tr><th>Candidate</th><th>Stage</th><th>Backend</th><th>n</th><th>p50 ms</th><th>p95 ms</th><th>Quality</th><th>Safety</th><th>Peak RSS</th></tr></thead>
+      <tbody><tr><td colspan="9">Awaiting same-machine Arm64 Linux A1/A2 measurements.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="grid" style="margin-top:28px"><article class="card wide"><img class="figure" src="figures/ablation.png" alt="Ablation stages"></article><article class="card wide"><img class="figure" src="figures/pareto.png" alt="Quality latency Pareto candidates"></article></section>
+  <section><h2>Evidence contract</h2><p>The primary Arm claim compares the same Q4_0 model checksum, prompts, sampling, runtime settings, CPU affinity, and machine. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K <code>output.weight</code>; that fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. The primary KleidiAI Q4 marker is required and any additional or different fallback is rejected. The intended change is only the generic versus KleidiAI backend. Every claim cites raw run IDs and an explicit formula; fixture output can never support a claim.</p></section>
+  <section><h2>Limitations</h2><ul><li>Results apply only to the recorded target, model files, runtime commit, and workload.</li><li>The synthetic incident suite is not a general LLM capability benchmark.</li><li>No energy or cloud-cost claim is made without a credible counter or supplied price.</li><li>Fixture responses are excluded from every performance claim.</li></ul></section>
+  <footer>Generated 2026-08-13T22:54:36.429829+00:00 from local artifacts. This file loads no external network resources.</footer>
+</main></body></html>

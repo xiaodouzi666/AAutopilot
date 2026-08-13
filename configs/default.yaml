@@ -1,0 +1,40 @@
+project:
+  name: aarch64-autopilot
+  artifacts_dir: artifacts
+
+runtime:
+  host: 127.0.0.1
+  port: 8088
+  generic_base_port: 18080
+  optimized_base_port: 18180
+  startup_timeout_s: 180
+  request_timeout_s: 180
+  cpu_only: true
+
+models:
+  weak:
+    repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    candidates: [Q4_0]
+  strong:
+    repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+    candidates: [Q4_0, Q8_0]
+
+benchmark:
+  warmup_requests: 2
+  repetitions: 3
+  max_search_minutes: 120
+  random_seed: 20260813
+  max_output_tokens: 192
+  temperature: 0.0
+
+quality_gate:
+  max_absolute_quality_drop: 1.0
+  minimum_safety_score: 100.0
+  maximum_schema_failures: 0
+  p95_latency_ms: null
+  peak_rss_mb: null
+
+selection:
+  policy: pareto_knee
+  minimize: [p95_latency_ms, peak_rss_mb]
+  maximize: [requests_per_second, quality_score]

@@ -1,0 +1,49 @@
+{
+  "plugin": "devpost-hackathon",
+  "version": 2,
+  "hackathon": {
+    "slug": "arm-ai-optimization-challenge",
+    "name": "Arm Create: AI Optimization Challenge",
+    "url": "https://arm-ai-optimization-challenge.devpost.com",
+    "selected": true,
+    "source": "official-devpost"
+  },
+  "participant": {
+    "name": "Frank douzi",
+    "display_name": "Frank douzi"
+  },
+  "project": {
+    "name": "AArch64 Autopilot",
+    "summary": "A self-optimizing, evidence-producing AI inference stack for Arm64 CPUs.",
+    "ai_usage": "Official Qwen2.5 GGUF models perform constrained synthetic incident triage.",
+    "codex_usage": "Codex implemented, tested, audited, documented, and prepared the project and evidence workflow."
+  },
+  "current_stage": "prepare-submission",
+  "completed_stages": [
+    "start-hackathon",
+    "review-hackathon-rules",
+    "build-project"
+  ],
+  "rules_acknowledged": true,
+  "learning": {
+    "status": "completed",
+    "current_step": "",
+    "completed_steps": [
+      "scope",
+      "prd",
+      "technical-spec",
+      "build-checklist",
+      "implementation",
+      "local-verification"
+    ],
+    "plan_file": "aarch64-autopilot-cc-master-plan.md",
+    "checklist_file": "BUILD_STATUS.md"
+  },
+  "submission": {
+    "draft_file": "devpost-submission.md",
+    "status": "awaiting-arm64-evidence-and-publication",
+    "thumbnail_file": "assets/submission/aarch64-autopilot-thumbnail.png",
+    "video_file": "artifacts/submission/a64pilot-demo-final.mp4"
+  },
+  "next_command": "submit-project"
+}

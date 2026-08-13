@@ -1,0 +1,13 @@
+quick:
+  thread_fractions: [0.5, 1.0]
+  batch: [128, 256]
+  ubatch: [64, 128]
+  parallel: [1, 2]
+  context: [2048]
+
+full:
+  thread_fractions: [0.25, 0.5, 1.0]
+  batch: [128, 256, 512]
+  ubatch: [64, 128, 256]
+  parallel: [1, 2, 4]
+  context: [2048, 4096]

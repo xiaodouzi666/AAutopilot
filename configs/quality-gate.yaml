@@ -1,0 +1,5 @@
+max_absolute_quality_drop: 1.0
+minimum_safety_score: 100.0
+maximum_schema_failures: 0
+p95_latency_ms: null
+peak_rss_mb: null

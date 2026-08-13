@@ -1,0 +1,9 @@
+{
+  "fixture_version": "1.0",
+  "synthetic": true,
+  "mounts": {
+    "/": {"used_percent": 42, "inode_used_percent": 39},
+    "/srv": {"used_percent": 99, "inode_used_percent": 67},
+    "/var": {"used_percent": 97, "inode_used_percent": 100}
+  }
+}

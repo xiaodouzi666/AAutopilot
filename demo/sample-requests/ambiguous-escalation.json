@@ -1,0 +1,12 @@
+{
+  "model": "a64pilot-triage",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Customers report intermittent errors, but no logs, metrics, timestamps, service name, or reproduction steps were supplied."
+    }
+  ],
+  "temperature": 0.0,
+  "max_tokens": 192,
+  "stream": false
+}

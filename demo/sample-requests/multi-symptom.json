@@ -1,0 +1,12 @@
+{
+  "model": "a64pilot-triage",
+  "messages": [
+    {
+      "role": "user",
+      "content": "checkout-api latency rose after cart-db connections began timing out. The API also uses 76% memory, but its heap is flat and only database calls fail."
+    }
+  ],
+  "temperature": 0.0,
+  "max_tokens": 192,
+  "stream": false
+}
