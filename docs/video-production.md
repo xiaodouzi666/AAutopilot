@@ -40,10 +40,10 @@ diagnosis, and read-only tool calls. The receipt generator itself refuses non-Li
 fixture or calibration rows, rows outside headline claim provenance, schema failures, non-100%
 safety, and unverified CPU-only runs. A static report chart alone does not satisfy this media gate.
 
-The temporary `report-pending-screenshot.png` is deliberately not a final-video input: it was a
-browser capture, its contents are evidence-pending, and its extension does not match its JPEG
-encoding. A final screenshot should instead be captured from the validated report on the Arm run,
-but the reproducible video uses the report figures directly.
+The temporary `report-pending-screenshot.png` is deliberately not a final-video input: it is an
+honest evidence-pending browser capture retained only for layout review. A final screenshot must
+instead be captured from the validated report on the Arm run, while the reproducible video uses
+the report figures directly.
 
 ## Draft preview
 

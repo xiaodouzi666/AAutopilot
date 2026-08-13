@@ -31,6 +31,9 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
   a clearly watermarked non-publishable local draft.
 - [x] Local source suite: 183 tests plus Ruff, formatting, shell syntax, workflow YAML, wheel, data,
   fixture, secret/redaction, and fail-closed media checks.
+- [x] Chrome click-through of every report navigation/skip link; desktop visual inspection; loaded
+  figures; non-streaming/streaming fixture API; health/models/metrics; traversal rejection; and
+  clean server shutdown.
 
 ## Publication status
 
