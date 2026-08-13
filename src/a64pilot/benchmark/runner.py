@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import platform
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -27,7 +28,11 @@ from a64pilot.benchmark.quality import (
 )
 from a64pilot.benchmark.store import ArtifactStore
 from a64pilot.build.cmake import BuildVariant
-from a64pilot.build.verify_backend import verify_backend_log, verify_cpu_only
+from a64pilot.build.verify_backend import (
+    BackendVerification,
+    verify_backend_log,
+    verify_cpu_only,
+)
 from a64pilot.hardware.detect import assert_arm64_benchmark
 from a64pilot.models.checksum import sha256_file
 from a64pilot.models.gguf import ModelInventoryProof, verify_model_inventory
@@ -41,6 +46,32 @@ from a64pilot.schemas import BenchmarkRecord, BuildManifest
 
 class BenchmarkEnvironmentError(RuntimeError):
     pass
+
+
+def _wait_for_kleidiai_load_proof(
+    manager: LlamaServerProcess,
+    *,
+    quantization: str,
+    reviewed_model: ModelInventoryProof,
+    timeout_s: float = 5.0,
+    interval_s: float = 0.05,
+) -> tuple[str, BackendVerification]:
+    """Wait briefly for the async logger to flush both required load markers."""
+
+    if timeout_s < 0 or interval_s <= 0:
+        raise ValueError("load-proof timeout must be non-negative and interval positive")
+    deadline = time.monotonic() + timeout_s
+    while True:
+        log_text = manager.log_tail(3000)
+        proof = verify_backend_log(
+            log_text,
+            BuildVariant.KLEIDIAI,
+            quantization=quantization,
+            reviewed_model=reviewed_model,
+        )
+        if proof.verified or time.monotonic() >= deadline:
+            return log_text, proof
+        time.sleep(min(interval_s, max(0.0, deadline - time.monotonic())))
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,19 +200,23 @@ class RealServiceBenchmark:
             raise ValueError(f"no cases selected for split {split}")
         output: list[BenchmarkRecord] = []
         scores = []
+        runtime_marker_recorded = False
         response_format = triage_openai_response_format()
         try:
             manager.start()
-            log_text = manager.log_tail(3000)
             expected = (
                 BuildVariant.KLEIDIAI if candidate.backend == "kleidiai" else BuildVariant.GENERIC
             )
-            backend_proof = verify_backend_log(
-                log_text,
-                expected,
-                quantization=candidate.quantization if candidate.backend == "kleidiai" else None,
-                reviewed_model=reviewed_model,
-            )
+            if candidate.backend == "kleidiai":
+                assert reviewed_model is not None
+                log_text, backend_proof = _wait_for_kleidiai_load_proof(
+                    manager,
+                    quantization=candidate.quantization,
+                    reviewed_model=reviewed_model,
+                )
+            else:
+                log_text = manager.log_tail(3000)
+                backend_proof = verify_backend_log(log_text, expected)
             cache_text = candidate.cmake_cache.read_text(encoding="utf-8", errors="replace")
             cpu_proof = verify_cpu_only(
                 manager.command,
@@ -193,9 +228,6 @@ class RealServiceBenchmark:
                 raise BenchmarkEnvironmentError("; ".join(backend_proof.errors))
             if not cpu_proof.verified:
                 raise BenchmarkEnvironmentError("; ".join(cpu_proof.errors))
-            if candidate.backend == "kleidiai":
-                _mark_kleidiai_runtime_verified(self.artifacts_dir / "build-manifest.json")
-
             async with OpenAIClient(f"http://127.0.0.1:{port}", timeout_s=240.0) as client:
                 for case in cases[:warmups]:
                     await client.chat_completion(
@@ -208,6 +240,26 @@ class RealServiceBenchmark:
                         stream=True,
                         response_format=response_format,
                     )
+                    if candidate.backend == "kleidiai" and not runtime_marker_recorded:
+                        post_request_log = manager.log_tail(3000)
+                        post_request_backend = verify_backend_log(
+                            post_request_log,
+                            expected,
+                            quantization=candidate.quantization,
+                            reviewed_model=reviewed_model,
+                        )
+                        post_request_cpu = verify_cpu_only(
+                            manager.command,
+                            cmake_cache=cache_text,
+                            runtime_log=post_request_log,
+                            require_device_none=True,
+                        )
+                        if not post_request_backend.verified:
+                            raise BenchmarkEnvironmentError("; ".join(post_request_backend.errors))
+                        if not post_request_cpu.verified:
+                            raise BenchmarkEnvironmentError("; ".join(post_request_cpu.errors))
+                        _mark_kleidiai_runtime_verified(self.artifacts_dir / "build-manifest.json")
+                        runtime_marker_recorded = True
                 for repetition in range(repetitions):
                     for case in cases:
                         messages = build_messages(case.incident)
@@ -246,6 +298,11 @@ class RealServiceBenchmark:
                             raise BenchmarkEnvironmentError("; ".join(run_backend_proof.errors))
                         if not run_cpu_proof.verified:
                             raise BenchmarkEnvironmentError("; ".join(run_cpu_proof.errors))
+                        if candidate.backend == "kleidiai" and not runtime_marker_recorded:
+                            _mark_kleidiai_runtime_verified(
+                                self.artifacts_dir / "build-manifest.json"
+                            )
+                            runtime_marker_recorded = True
                         record = BenchmarkRecord(
                             run_id=run_id,
                             candidate_id=candidate.candidate_id,

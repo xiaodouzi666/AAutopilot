@@ -35,6 +35,9 @@ _PROTECTED_OPTIONS = {
     "--parallel",
     "-np",
     "--seed",
+    "-lv",
+    "--verbosity",
+    "--log-verbosity",
     "--n-gpu-layers",
     "-ngl",
     "--gpu-layers",
@@ -112,6 +115,7 @@ class LlamaServerConfig:
     context_size: int = 2048
     parallel: int = 1
     seed: int = 20260813
+    log_verbosity: int = 4
     cpu_only: bool = True
     enable_metrics: bool = True
     disable_webui: bool = True
@@ -128,6 +132,8 @@ class LlamaServerConfig:
         for name in ("threads", "batch_size", "ubatch_size", "context_size", "parallel"):
             if getattr(self, name) < 1:
                 raise CommandConfigurationError(f"{name} must be positive")
+        if not 0 <= self.log_verbosity <= 5:
+            raise CommandConfigurationError("log_verbosity must be in the range 0..5")
         if self.ubatch_size > self.batch_size:
             raise CommandConfigurationError("ubatch_size must not exceed batch_size")
         if not self.model_alias.strip():
@@ -219,6 +225,8 @@ def build_llama_server_command(
         str(config.parallel),
         "--seed",
         str(config.seed),
+        "-lv",
+        str(config.log_verbosity),
     ]
 
     device_none = False

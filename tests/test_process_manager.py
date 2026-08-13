@@ -90,6 +90,8 @@ def test_typed_command_is_shell_free_and_cpu_only(fake_binary: Path, tmp_path: P
     assert argv[argv.index("--device") + 1] == "none"
     assert argv[argv.index("--n-gpu-layers") + 1] == "0"
     assert argv[argv.index("--host") + 1] == "127.0.0.1"
+    assert argv.count("-lv") == 1
+    assert argv[argv.index("-lv") + 1] == "4"
     assert command.proof.cpu_only_flags_complete
     assert command.proof.localhost
 
@@ -118,6 +120,9 @@ def test_cpu_only_command_refuses_incomplete_pinned_capabilities(
         ("--port=9999",),
         ("--seed", "7"),
         ("--alias=misleading",),
+        ("-lv", "3"),
+        ("--verbosity=3",),
+        ("--log-verbosity", "5"),
     ],
 )
 def test_protected_options_cannot_be_overridden(
@@ -130,6 +135,12 @@ def test_protected_options_cannot_be_overridden(
 def test_ubatch_must_not_exceed_batch(fake_binary: Path, tmp_path: Path) -> None:
     with pytest.raises(CommandConfigurationError, match="ubatch_size"):
         make_config(fake_binary, tmp_path, batch_size=64, ubatch_size=128)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 6])
+def test_log_verbosity_is_bounded(fake_binary: Path, tmp_path: Path, verbosity: int) -> None:
+    with pytest.raises(CommandConfigurationError, match="log_verbosity"):
+        make_config(fake_binary, tmp_path, log_verbosity=verbosity)
 
 
 def test_remote_bind_requires_explicit_opt_in(fake_binary: Path, tmp_path: Path) -> None:
@@ -184,6 +195,8 @@ def test_process_readiness_logs_rss_and_cleanup(fake_binary: Path, tmp_path: Pat
     assert command_record["shell"] is False
     assert command_record["command_proof"]["device_none"] is True
     assert command_record["command_proof"]["gpu_layers_zero"] is True
+    assert command_record["argv"].count("-lv") == 1
+    assert command_record["argv"][command_record["argv"].index("-lv") + 1] == "4"
     assert os.path.basename(command_record["argv"][0]) == "fake llama-server"
 
 

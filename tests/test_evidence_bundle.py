@@ -198,6 +198,8 @@ def _command(backend: str, model_filename: str) -> list[str]:
         "1",
         "--seed",
         "20260813",
+        "-lv",
+        "4",
         "--n-gpu-layers",
         "0",
         "--device",
@@ -207,7 +209,11 @@ def _command(backend: str, model_filename: str) -> list[str]:
 
 def _runtime_log(backend: str) -> str:
     if backend == "kleidiai":
-        return "kleidiai: primary q4 kernel feature sve2\nCPU backend ready\n"
+        return (
+            "kleidiai: primary q4 kernel feature sve2\n"
+            "load_tensors: CPU_KLEIDIAI model buffer size = 934.62 MiB\n"
+            "CPU backend ready\n"
+        )
     return "generic CPU backend ready\n"
 
 
@@ -528,7 +534,8 @@ def test_runtime_marker_tampering_is_rejected(valid_bundle: EvidenceBundle) -> N
 
     _, errors = validate_evidence_bundle(valid_bundle.artifacts)
 
-    assert any("runtime log has no CPU_KLEIDIAI marker" in error for error in errors)
+    assert any("runtime log has no CPU_KLEIDIAI model buffer marker" in error for error in errors)
+    assert any("runtime log has no KleidiAI primary quant" in error for error in errors)
 
 
 def test_command_fair_settings_tampering_is_rejected(valid_bundle: EvidenceBundle) -> None:
@@ -547,6 +554,40 @@ def test_command_fair_settings_tampering_is_rejected(valid_bundle: EvidenceBundl
     _, errors = validate_evidence_bundle(valid_bundle.artifacts)
 
     assert any("command --threads must appear exactly once as 4" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    [
+        ("remove", "command -lv must appear exactly once as 4"),
+        ("change", "command -lv must appear exactly once as 4"),
+        ("duplicate", "command -lv must appear exactly once as 4"),
+    ],
+)
+def test_command_log_verbosity_tampering_is_rejected(
+    valid_bundle: EvidenceBundle, mutation: str, expected: str
+) -> None:
+    run_dir = valid_bundle.artifacts / "raw" / valid_bundle.first_kleidiai_run
+    request_rows = (run_dir / "requests.jsonl").read_text(encoding="utf-8").splitlines()
+    record = BenchmarkRecord.model_validate_json(request_rows[0])
+    command = list(record.command)
+    index = command.index("-lv")
+    if mutation == "remove":
+        del command[index : index + 2]
+    elif mutation == "change":
+        command[index + 1] = "3"
+    else:
+        command.extend(("--verbosity", "4"))
+    modified = record.model_copy(update={"command": command})
+    (run_dir / "requests.jsonl").write_text(
+        modified.model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+    _refinalize(valid_bundle, valid_bundle.first_kleidiai_run)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert any(expected in error for error in errors)
 
 
 def test_request_sampling_settings_tampering_is_rejected(valid_bundle: EvidenceBundle) -> None:

@@ -13,19 +13,6 @@ from a64pilot.models.registry import get_model
 
 from .cmake import BuildPlan, BuildVariant, fairness_differences
 
-_KLEIDIAI_MARKERS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\bCPU_KLEIDIAI\b", re.IGNORECASE),
-    re.compile(r"\bkleidiai\b.*\bmodel\s+buffer\s+size\b", re.IGNORECASE),
-    re.compile(r"\b(?:loaded|selected|using)\b.*\bkleidiai\s+backend\b", re.IGNORECASE),
-    # Pinned llama.cpp a94d563 emits this after selecting a usable KleidiAI
-    # kernel.  The adjacent "no compatible ..." message intentionally does
-    # not match and therefore cannot produce a false VERIFIED badge.
-    re.compile(
-        r"\bkleidiai:\s+primary\s+(?:q4|q8|f32)\s+kernel\s+feature\b",
-        re.IGNORECASE,
-    ),
-)
-
 _KLEIDIAI_REJECTION_MARKERS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bkleidiai\b.*\bno\s+kernel\s+for\s+tensor\s+type\b", re.IGNORECASE),
     re.compile(r"\bkleidiai\b.*\bnot\s+accelerated\b", re.IGNORECASE),
@@ -41,6 +28,10 @@ _KLEIDIAI_QUANT_KERNELS = {
     "Q4_0": re.compile(r"\bkleidiai:\s+primary\s+q4\s+kernel\s+feature\b", re.IGNORECASE),
     "Q8_0": re.compile(r"\bkleidiai:\s+primary\s+q8\s+kernel\s+feature\b", re.IGNORECASE),
 }
+
+_KLEIDIAI_MODEL_BUFFER_MARKER = re.compile(
+    r"\bCPU_KLEIDIAI\s+model\s+buffer\s+size\b", re.IGNORECASE
+)
 
 _REVIEWED_Q6_K_FALLBACK = re.compile(
     r"\bkleidiai:\s+no\s+kernel\s+for\s+tensor\s+type\s+Q6_K,\s+"
@@ -175,13 +166,17 @@ def verify_backend_log(
     """
 
     variant = BuildVariant(expected)
-    matching = _matching_lines(log_text, _KLEIDIAI_MARKERS)
-    marker_found = bool(matching)
+    kernel_matching = _matching_lines(log_text, tuple(_KLEIDIAI_QUANT_KERNELS.values()))
+    buffer_matching = _matching_lines(log_text, (_KLEIDIAI_MODEL_BUFFER_MARKER,))
+    matching = kernel_matching + buffer_matching
+    marker_found = bool(kernel_matching) and bool(buffer_matching)
     rejected = _matching_lines(log_text, _KLEIDIAI_REJECTION_MARKERS)
     if variant is BuildVariant.KLEIDIAI:
         errors: list[str] = []
-        if not marker_found:
-            errors.append("runtime log has no CPU_KLEIDIAI marker")
+        if not kernel_matching:
+            errors.append("runtime log has no KleidiAI primary quant kernel-selection marker")
+        if not buffer_matching:
+            errors.append("runtime log has no CPU_KLEIDIAI model buffer marker")
         if rejected and not _is_reviewed_strong_q4_fallback(
             rejected,
             quantization=quantization,
@@ -200,11 +195,11 @@ def verify_backend_log(
         evidence = matching + rejected
     else:
         errors = []
-        if marker_found or rejected:
+        if matching or rejected:
             errors.append("generic runtime unexpectedly reported KleidiAI activity")
         evidence = (
             ("no KleidiAI runtime marker in generic log",)
-            if not marker_found and not rejected
+            if not matching and not rejected
             else matching + rejected
         )
     return BackendVerification(

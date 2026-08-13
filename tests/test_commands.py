@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from a64pilot.benchmark.runner import _wait_for_kleidiai_load_proof
 from a64pilot.build.cmake import (
     BuildArtifact,
     BuildError,
@@ -88,7 +89,21 @@ def test_runtime_marker_must_come_from_log() -> None:
     assert not verify_backend_log(generic_log, "kleidiai").verified
     assert not verify_backend_log(optimized_log, "generic").verified
     assert not verify_backend_log("KleidiAI backend disabled", "kleidiai").verified
-    assert verify_backend_log("kleidiai: primary q4 kernel feature dotprod", "kleidiai").verified
+    assert verify_backend_log(
+        "kleidiai: primary q4 kernel feature dotprod\n"
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB",
+        "kleidiai",
+    ).verified
+    assert not verify_backend_log(
+        "kleidiai: primary q4 kernel feature dotprod", "kleidiai"
+    ).verified
+    assert not verify_backend_log(
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB", "kleidiai"
+    ).verified
+    assert not verify_backend_log("kleidiai: primary q4 kernel feature dotprod", "generic").verified
+    assert not verify_backend_log(
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB", "generic"
+    ).verified
     assert not verify_backend_log(
         "kleidiai: no compatible q4 kernels found for CPU features mask 0", "kleidiai"
     ).verified
@@ -125,8 +140,23 @@ def test_kleidiai_verifier_allows_only_exact_reviewed_strong_q4_fallback() -> No
         "kleidiai: no kernel for tensor type Q6_K, not accelerated by KleidiAI "
         "(kernels available for Q4_0 and Q8_0)"
     )
-    log = f"kleidiai: primary q4 kernel feature DOTPROD\n{warning}"
+    log = (
+        "kleidiai: primary q4 kernel feature DOTPROD\n"
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB\n"
+        f"{warning}"
+    )
     proof = _strong_q4_inventory_proof()
+    warning_only = verify_backend_log(
+        warning,
+        "kleidiai",
+        quantization="Q4_0",
+        reviewed_model=proof,
+    )
+    assert not warning_only.verified
+    assert not warning_only.marker_found
+    assert any("no KleidiAI primary quant" in error for error in warning_only.errors)
+    assert any("no CPU_KLEIDIAI model buffer" in error for error in warning_only.errors)
+    assert any("no KleidiAI Q4_0 kernel-selection marker" in error for error in warning_only.errors)
     assert verify_backend_log(
         log,
         "kleidiai",
@@ -165,15 +195,69 @@ def test_kleidiai_verifier_allows_only_exact_reviewed_strong_q4_fallback() -> No
     ],
 )
 def test_kleidiai_verifier_rejects_other_acceleration_fallbacks(warning: str) -> None:
-    log = f"kleidiai: primary q4 kernel feature DOTPROD\n{warning}"
+    log = (
+        "kleidiai: primary q4 kernel feature DOTPROD\n"
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB\n"
+        f"{warning}"
+    )
     assert not verify_backend_log(log, "kleidiai", quantization="Q4_0").verified
 
 
 def test_kleidiai_verifier_requires_quantization_specific_kernel() -> None:
-    q4_log = "kleidiai: primary q4 kernel feature DOTPROD"
+    q4_log = (
+        "kleidiai: primary q4 kernel feature DOTPROD\n"
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB"
+    )
     assert verify_backend_log(q4_log, "kleidiai", quantization="Q4_0").verified
     assert not verify_backend_log(q4_log, "kleidiai", quantization="Q8_0").verified
     assert not verify_backend_log(q4_log, "kleidiai", quantization="Q4_K_M").verified
+
+
+def test_kleidiai_load_proof_poll_waits_for_both_async_markers() -> None:
+    complete = (
+        "kleidiai: primary q4 kernel feature DOTPROD\n"
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB"
+    )
+
+    class LogSequence:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def log_tail(self, _lines: int) -> str:
+            self.calls += 1
+            return "kleidiai: primary q4 kernel feature DOTPROD" if self.calls == 1 else complete
+
+    manager = LogSequence()
+    log_text, proof = _wait_for_kleidiai_load_proof(  # type: ignore[arg-type]
+        manager,
+        quantization="Q4_0",
+        reviewed_model=_strong_q4_inventory_proof(),
+        timeout_s=0.1,
+        interval_s=0.001,
+    )
+    assert manager.calls == 2
+    assert log_text == complete
+    assert proof.verified
+
+
+def test_kleidiai_load_proof_poll_never_accepts_warning_only() -> None:
+    warning = (
+        "kleidiai: no kernel for tensor type Q6_K, not accelerated by KleidiAI "
+        "(kernels available for Q4_0 and Q8_0)"
+    )
+
+    class WarningOnly:
+        def log_tail(self, _lines: int) -> str:
+            return warning
+
+    _, proof = _wait_for_kleidiai_load_proof(  # type: ignore[arg-type]
+        WarningOnly(),
+        quantization="Q4_0",
+        reviewed_model=_strong_q4_inventory_proof(),
+        timeout_s=0,
+    )
+    assert not proof.verified
+    assert not proof.marker_found
 
 
 def test_cpu_only_verifier_requires_command_cache_and_no_gpu_marker() -> None:
