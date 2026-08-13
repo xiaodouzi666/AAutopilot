@@ -32,6 +32,7 @@ THUMBNAIL_NAME = "aarch64-autopilot-thumbnail.png"
 REPORT_FIGURES = ("ablation.png", "pareto.png")
 TARGET_RECEIPT_NAME = "arm-target-demo-receipt.json"
 TARGET_RECEIPT_SCHEMA = "1.0"
+ESPEAK_VOICE = "en-us"
 
 
 class MediaNotReady(RuntimeError):
@@ -44,6 +45,16 @@ class Slide:
     lines: tuple[str, ...]
     narration: str
     image: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NarrationBackend:
+    """One local-only narration implementation selected for the whole render."""
+
+    engine: str
+    executable: str | None
+    voice: str | None
+    audio_suffix: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -596,12 +607,82 @@ def _write_silence(path: Path, duration: float) -> None:
         handle.writeframes(b"\0\0" * frames)
 
 
-def _narrate(text: str, destination: Path, *, voice: str, words_per_minute: int) -> None:
-    if platform.system() == "Darwin" and shutil.which("say"):
-        _run(["say", "-v", voice, "-r", str(words_per_minute), "-o", str(destination), text])
+def _select_narration_backend(*, macos_voice: str, require_narration: bool) -> NarrationBackend:
+    """Choose an offline English narrator without contacting a network service."""
+
+    system = platform.system()
+    if system == "Linux" and (executable := shutil.which("espeak-ng")):
+        return NarrationBackend(
+            engine="espeak-ng offline English",
+            executable=executable,
+            voice=ESPEAK_VOICE,
+            audio_suffix=".wav",
+        )
+    if system == "Darwin" and (executable := shutil.which("say")):
+        return NarrationBackend(
+            engine="macOS say",
+            executable=executable,
+            voice=macos_voice,
+            audio_suffix=".aiff",
+        )
+    if executable := shutil.which("espeak-ng"):
+        return NarrationBackend(
+            engine="espeak-ng offline English",
+            executable=executable,
+            voice=ESPEAK_VOICE,
+            audio_suffix=".wav",
+        )
+    if require_narration:
+        raise MediaNotReady(
+            "final video requires an offline narration engine: install espeak-ng on Linux "
+            "or use macOS with the built-in say command"
+        )
+    return NarrationBackend(
+        engine="silent draft fallback",
+        executable=None,
+        voice=None,
+        audio_suffix=".wav",
+    )
+
+
+def _narrate(
+    text: str,
+    destination: Path,
+    *,
+    backend: NarrationBackend,
+    words_per_minute: int,
+) -> None:
+    if backend.engine == "macOS say":
+        assert backend.executable is not None and backend.voice is not None
+        _run(
+            [
+                backend.executable,
+                "-v",
+                backend.voice,
+                "-r",
+                str(words_per_minute),
+                "-o",
+                str(destination),
+                text,
+            ]
+        )
         return
-    # Cross-platform fallback keeps the video reproducible and music-free. It
-    # intentionally emits silence rather than downloading an untracked voice.
+    if backend.engine == "espeak-ng offline English":
+        assert backend.executable is not None and backend.voice is not None
+        _run(
+            [
+                backend.executable,
+                "-v",
+                backend.voice,
+                "-s",
+                str(words_per_minute),
+                "-w",
+                str(destination),
+                text,
+            ]
+        )
+        return
+    # Draft previews remain portable when neither local narrator is installed.
     word_count = len(re.findall(r"\b[\w'-]+\b", text))
     _write_silence(destination, max(4.0, word_count / words_per_minute * 60.0))
 
@@ -655,6 +736,10 @@ def render_video(
     if not ffmpeg or not ffprobe or not magick:
         raise MediaNotReady("ffmpeg, ffprobe, and ImageMagick are required")
     font = _find_font()
+    narration_backend = _select_narration_backend(
+        macos_voice=voice,
+        require_narration=not draft,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="a64pilot-video-") as temporary:
@@ -662,10 +747,15 @@ def render_video(
         clips: list[Path] = []
         for index, slide in enumerate(slides):
             frame = work / f"slide-{index:02d}.png"
-            audio = work / f"slide-{index:02d}.aiff"
+            audio = work / f"slide-{index:02d}{narration_backend.audio_suffix}"
             clip = work / f"slide-{index:02d}.mp4"
             _render_slide(slide, frame, magick=magick, font=font, draft=draft)
-            _narrate(slide.narration, audio, voice=voice, words_per_minute=words_per_minute)
+            _narrate(
+                slide.narration,
+                audio,
+                backend=narration_backend,
+                words_per_minute=words_per_minute,
+            )
             audio_duration = _duration(audio, ffprobe=ffprobe)
             slide_duration = max(6.0, audio_duration + 0.7)
             _run(
@@ -751,8 +841,9 @@ def render_video(
         "mode": "draft_measurement_pending" if draft else "final_measured",
         "publishable": not draft,
         "music": "none",
-        "narration": "macOS say" if platform.system() == "Darwin" else "silent fallback",
-        "voice": voice if platform.system() == "Darwin" else None,
+        "narration": narration_backend.engine,
+        "narration_offline": True,
+        "voice": narration_backend.voice,
         "words_per_minute": words_per_minute,
         "font": font.name,
         "duration_seconds": round(duration, 3),

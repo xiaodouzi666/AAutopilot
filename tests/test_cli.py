@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import platform
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -41,6 +42,9 @@ def test_doctor_writes_shared_schema(tmp_path: Path) -> None:
     assert result.exit_code == 0
     payload = json.loads((tmp_path / "system-info.json").read_text(encoding="utf-8"))
     shared = SystemInfo.model_validate(payload)
-    assert shared.architecture == "aarch64"
-    assert shared.operating_system == "Darwin"
-    assert shared.real_benchmark_eligible is False
+    assert shared.architecture in {"aarch64", "x86_64"}
+    assert shared.operating_system == platform.system()
+    assert shared.arm64 is (shared.architecture == "aarch64")
+    assert shared.real_benchmark_eligible is (
+        shared.architecture == "aarch64" and shared.operating_system == "Linux"
+    )

@@ -116,6 +116,91 @@ def test_draft_media_allows_pending_only_with_watermark_policy(
     assert all("%" not in line for slide in slides for line in slide.lines if line[:1].isdigit())
 
 
+def test_linux_narration_uses_offline_espeak_ng(
+    tmp_path: Path,
+    media: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(media.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(
+        media.shutil,
+        "which",
+        lambda name: "/usr/bin/espeak-ng" if name == "espeak-ng" else None,
+    )
+    backend = media._select_narration_backend(
+        macos_voice="Samantha",
+        require_narration=True,
+    )
+    assert backend.engine == "espeak-ng offline English"
+    assert backend.voice == "en-us"
+    assert backend.audio_suffix == ".wav"
+
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], *, capture: bool = False) -> None:
+        assert not capture
+        commands.append(command)
+
+    monkeypatch.setattr(media, "_run", fake_run)
+    destination = tmp_path / "narration.wav"
+    media._narrate(
+        "AArch64 Autopilot measured the Arm target.",
+        destination,
+        backend=backend,
+        words_per_minute=185,
+    )
+    assert commands == [
+        [
+            "/usr/bin/espeak-ng",
+            "-v",
+            "en-us",
+            "-s",
+            "185",
+            "-w",
+            str(destination),
+            "AArch64 Autopilot measured the Arm target.",
+        ]
+    ]
+
+
+def test_macos_narration_keeps_builtin_say(
+    media: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(media.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        media.shutil,
+        "which",
+        lambda name: "/usr/bin/say" if name == "say" else "/opt/homebrew/bin/espeak-ng",
+    )
+    backend = media._select_narration_backend(
+        macos_voice="Samantha",
+        require_narration=True,
+    )
+    assert backend.engine == "macOS say"
+    assert backend.voice == "Samantha"
+    assert backend.audio_suffix == ".aiff"
+
+
+def test_final_media_refuses_silent_narration_backend(
+    media: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(media.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(media.shutil, "which", lambda _name: None)
+    with pytest.raises(media.MediaNotReady, match="requires an offline narration engine"):
+        media._select_narration_backend(
+            macos_voice="Samantha",
+            require_narration=True,
+        )
+    backend = media._select_narration_backend(
+        macos_voice="Samantha",
+        require_narration=False,
+    )
+    assert backend.engine == "silent draft fallback"
+    assert backend.voice is None
+
+
 def test_measured_claims_must_match_report_and_have_sources(
     tmp_path: Path,
     media: ModuleType,

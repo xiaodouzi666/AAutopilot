@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 import a64pilot.optimize.tune as tune_module
@@ -119,11 +120,17 @@ def test_candidate_result_requires_formal_test_rows() -> None:
 
 
 def test_benchmark_tune_command_is_exposed() -> None:
-    result = CliRunner().invoke(app, ["benchmark", "tune", "--help"])
+    result = CliRunner().invoke(
+        app,
+        ["benchmark", "tune", "--help"],
+        terminal_width=160,
+        color=False,
+    )
     assert result.exit_code == 0
-    assert "topology-derived" in result.stdout
-    assert "--max-candidates" in result.stdout
-    assert "--calibration-cases" in result.stdout
+    help_text = unstyle(result.stdout)
+    assert "topology-derived" in help_text
+    assert "--max-candidates" in help_text
+    assert "--calibration-cases" in help_text
 
 
 def test_bounded_tune_records_plan_and_validates_full_finalists(

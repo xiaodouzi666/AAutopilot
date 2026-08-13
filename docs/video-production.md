@@ -2,8 +2,10 @@
 
 The repository renders a static-slide demo directly from the generated evidence. It uses only
 repository-owned visuals, no stock media, and no music. On macOS the narration is generated with
-the built-in `say` voice; on other platforms the same slide video is generated with silence so no
-network TTS or untracked copyrighted audio enters the asset.
+the built-in `say` voice; the Linux evidence workflow uses the locally installed eSpeak NG English
+voice. Final mode refuses to render without one of those offline narrators. Only a watermarked,
+non-publishable draft may fall back to silence, so no network TTS or untracked copyrighted audio
+enters the asset.
 
 ## Final render
 

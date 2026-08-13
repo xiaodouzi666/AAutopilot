@@ -124,7 +124,12 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          sudo apt-get install -y --no-install-recommends ffmpeg imagemagick fonts-dejavu-core
+          sudo apt-get install -y --no-install-recommends \
+            espeak-ng \
+            ffmpeg \
+            fonts-dejavu-core \
+            imagemagick
+          espeak-ng --version
           uv run --frozen --no-editable python scripts/render-demo-video.py
 
       - name: Build a sanitized public evidence bundle
