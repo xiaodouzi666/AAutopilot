@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 
 import httpx
 import pytest
@@ -423,6 +425,60 @@ async def test_runtime_openai_client_measures_stream_without_inventing_nonstream
     assert streamed.timing.ttft_ms is not None
     assert nonstreamed.timing.first_content_token_ns is None
     assert nonstreamed.timing.ttft_ms is None
+
+
+@pytest.mark.asyncio
+async def test_runtime_openai_client_does_not_reuse_completed_sse_connections() -> None:
+    accepted_peers: list[tuple[str, int]] = []
+    connection_headers: list[str | None] = []
+    event_body = (
+        b'data: {"id":"fresh-connection","model":"fixture","choices":'
+        b'[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}'
+        b"\n\ndata: [DONE]\n\n"
+    )
+
+    class RecordingServer(ThreadingHTTPServer):
+        def get_request(self) -> tuple[object, tuple[str, int]]:
+            request, peer = super().get_request()
+            accepted_peers.append(peer)
+            return request, peer
+
+    class SSEHandler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self) -> None:  # noqa: N802 - stdlib handler hook
+            content_length = int(self.headers.get("Content-Length", "0"))
+            self.rfile.read(content_length)
+            connection_headers.append(self.headers.get("Connection"))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(event_body)))
+            self.end_headers()
+            self.wfile.write(event_body)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            pass
+
+    server = RecordingServer(("127.0.0.1", 0), SSEHandler)
+    server_thread = Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        host, port = server.server_address
+        async with OpenAIClient(f"http://{host}:{port}") as client:
+            for _ in range(2):
+                completion = await client.chat_completion(
+                    messages=[{"role": "user", "content": "synthetic incident"}],
+                    model="fixture",
+                    stream=True,
+                )
+                assert completion.text == "ok"
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=5)
+
+    assert connection_headers == ["close", "close"]
+    assert len(accepted_peers) == 2
 
 
 @pytest.mark.asyncio

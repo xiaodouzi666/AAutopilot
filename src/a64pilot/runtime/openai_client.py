@@ -236,6 +236,11 @@ class OpenAIClient:
                 "POST",
                 f"{self.base_url}/v1/chat/completions",
                 json=dict(payload),
+                # llama-server may reap an idle HTTP/1.1 SSE socket before
+                # httpx notices. Never return a completed stream connection
+                # to the pool for a later measured POST; both backends pay the
+                # same fresh-connection cost and no request is retried.
+                headers={"Connection": "close"},
             ) as response:
                 try:
                     response.raise_for_status()
