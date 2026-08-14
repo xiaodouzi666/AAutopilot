@@ -15,6 +15,7 @@ BUILD_FLAGS ?=
 MODEL_FLAGS ?= --minimum
 SMOKE_FLAGS ?=
 BENCHMARK_FLAGS ?= --quick --repetitions 1
+PROBE_FLAGS ?= --repetitions 3 --max-minutes 20
 TUNE_FLAGS ?= --quick --max-candidates 8 --calibration-cases 4 --finalists 2
 OPTIMIZE_FLAGS ?=
 A4_CALIBRATION_FLAGS ?=
@@ -26,9 +27,9 @@ VERIFY_FLAGS ?=
 SUBMISSION_FLAGS ?=
 PERFORMIX_ARGS ?=
 
-.PHONY: help sync bootstrap doctor build models verify-models smoke fixture-smoke benchmark tune \
+.PHONY: help sync bootstrap doctor build models verify-models smoke fixture-smoke probes benchmark tune \
 	select a4-calibrate a4-held-out a4 optimize report serve demo verify-source verify \
-	verify-backends verify-claims \
+	verify-backends verify-probes verify-report-integrity verify-claims \
 	submission performix clean-generated
 
 help: ## Show stable project commands and overridable flags.
@@ -41,6 +42,7 @@ help: ## Show stable project commands and overridable flags.
 	  '  make models           Download the reviewed minimum Qwen GGUF model set' \
 	  '  make smoke            Run one real held-out case through both CPU-only backends' \
 	  '  make fixture-smoke    Run the labelled non-evidence fixture path' \
+	  '  make probes           Run bounded micro/startup/p1/p2 supporting probes' \
 	  '  make benchmark        Run the bounded real Arm64 benchmark (quick by default)' \
 	  '  make tune             Run the topology-derived A3 calibration/finalist search' \
 	  '  make a4               Calibrate/freeze A4, then run its one-time held-out gate' \
@@ -55,7 +57,8 @@ help: ## Show stable project commands and overridable flags.
 	  '' \
 	  'Common overrides:' \
 	  '  JOBS=4 BUILD_VARIANT=all BUILD_FLAGS="..." MODEL_FLAGS="--minimum"' \
-	  '  BENCHMARK_FLAGS="--quick --repetitions 1" A4_CALIBRATION_FLAGS="..."' \
+	  '  PROBE_FLAGS="--repetitions 3 --max-minutes 20" BENCHMARK_FLAGS="--quick --repetitions 1"' \
+	  '  A4_CALIBRATION_FLAGS="..."' \
 	  '  A4_HELD_OUT_FLAGS="..." REPORT_FLAGS="--allow-pending"' \
 	  '  SERVE_FLAGS="--upstream http://127.0.0.1:18180" DEMO_FLAGS="--fixture"' \
 	  '  VERIFY_FLAGS="--source-only" SUBMISSION_FLAGS="--allow-pending"'
@@ -84,6 +87,9 @@ smoke: ## Run the fastest real dual-backend benchmark; fixture output is never e
 fixture-smoke: ## Exercise the API safely on non-Arm hosts without creating claims.
 	$(UV_RUN) a64pilot smoke --fixture
 
+probes: ## Run the bounded supporting micro/startup/token/p1/p2 evidence matrix.
+	$(UV_RUN) a64pilot benchmark probes $(PROBE_FLAGS)
+
 benchmark: ## Run real A0-A3 measurements; defaults are deadline-safe and bounded.
 	$(UV_RUN) a64pilot benchmark all $(BENCHMARK_FLAGS)
 
@@ -101,7 +107,7 @@ a4-held-out: ## Replay the frozen A4 policy once on all 20 held-out cases.
 
 a4: a4-calibrate a4-held-out ## Complete A4 quality admission; gate rejection still ships A3.
 
-optimize: benchmark select a4 report ## Run A0-A4, select/fallback, and render the report.
+optimize: probes benchmark select a4 report ## Run probes plus A0-A4 and render the report.
 
 report: ## Render evidence and fail unless a fair measured claim exists.
 	$(UV_RUN) a64pilot report $(REPORT_FLAGS)
@@ -123,10 +129,16 @@ verify-source: ## Run deterministic checks that are valid on any supported devel
 verify-backends: ## Verify build caches plus measured CPU-only generic/KleidiAI rows.
 	./scripts/verify-cpu-only.sh
 
+verify-probes: ## Replay probe raw hashes, semantics, manifests, and current binary/model hashes.
+	$(UV_RUN) a64pilot verify-probes
+
+verify-report-integrity: ## Verify report hashes and embedded target provenance.
+	$(UV_RUN) a64pilot verify-report-integrity
+
 verify-claims: ## Resolve every public claim back to measured raw rows.
 	$(UV_RUN) a64pilot verify-claims
 
-verify: verify-source verify-backends verify-claims ## Run the complete submission gate.
+verify: verify-source verify-backends verify-probes verify-report-integrity verify-claims ## Run the complete submission gate.
 	$(UV_RUN) a64pilot verify $(VERIFY_FLAGS)
 
 submission: ## Render final submission copy; pending data fails by default.

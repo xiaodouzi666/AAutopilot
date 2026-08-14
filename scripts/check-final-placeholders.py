@@ -21,6 +21,7 @@ LEGACY_ALLOWLIST = {
 LEGACY_BANNER = "Historical planning"
 
 FINAL_FILES = {
+    "FINAL_HANDOFF.md",
     "README.md",
     "devpost-submission.md",
     "artifacts/devpost-writeup-final.md",

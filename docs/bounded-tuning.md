@@ -5,12 +5,12 @@ assume that half of the cores is optimal.
 
 ## Candidate generation
 
-`a64pilot benchmark tune` calls `a64pilot.optimize.candidates.generate_candidates` with the
-target's allowed and physical core counts. The generator combines a small thread set
-(`1`, quarter, half, and the physical/allowed ceiling) with bounded batch and micro-batch
-choices. Parallelism stays at one because the harness currently issues requests serially; it
-does not label an unmeasured server-slot setting as concurrency tuning. A deterministic round-robin subset covers all generated thread counts
-before taking a second service configuration from any thread group.
+`a64pilot benchmark tune` first strictly loads `artifacts/performance-probes.json`. The complete
+KleidiAI-Q4_0 micro cells are ranked by `tg64` tokens/s, then `pp128` tokens/s and thread count;
+only those measured thread counts advance. The service generator combines them with bounded batch
+and micro-batch choices. Parallelism stays at one because the formal quality harness issues
+requests serially. True p1/p2 concurrency is covered by the independent probe rounds, so the
+tuner never selects a multi-slot deployment from single-request latency.
 
 The deadline-safe defaults are:
 
@@ -21,10 +21,17 @@ The deadline-safe defaults are:
 - one process at a time, always using the official strong Q4_0 model and verified KleidiAI
   CPU-only runtime.
 
-The complete generated space, admitted subset, topology, budget, raw source run IDs, metrics,
-rejection reasons, finalists, and held-out receipts are written to `artifacts/search-plan.json`.
-An individual startup or execution failure is recorded as a rejected candidate and the bounded
-search continues; it cannot erase the rest of the candidate matrix.
+The complete generated space, micro ranking, scheduled subset, topology, budget, raw source run
+IDs, metrics, finalists, and held-out receipts are written to `artifacts/search-plan.json`. A
+redaction-stable semantic digest binds the plan to the probe measurements while private and public
+bundles each verify their own raw-log digests. Startup, inference, incomplete matrix, or timeout
+errors fail the tuning command closed; a complete plan cannot hide an unproved candidate failure.
+
+Resume accepts only a complete candidate receipt whose cited IDs exactly replay to the frozen
+case/repetition matrix and candidate settings. A completed plan is strictly replayed and returned
+without making another request. Partial or unreceipted raw rows stop the command rather than
+repeating uncertain inference. Elapsed execution is accumulated across resume, and one absolute
+monotonic deadline is passed into server startup and every individual request.
 
 ## No held-out tuning
 
@@ -33,12 +40,19 @@ count, verified CPU-only/KleidiAI execution, zero unhandled schema failures, ful
 quality within the configured drop from the best complete calibration candidate. Feasible
 candidates are ranked deterministically by p95 latency, throughput, RSS, quality, and ID.
 
-Only after finalist IDs are frozen does the tuner run each admitted A3 candidate over all 20
-held-out cases. The same configured quality gate is then evaluated against the complete A1
-generic baseline. If no finalist passes, the search records a fail-closed status and profile
-selection falls back specifically to the measured A2 strong-model candidate. Held-out metrics
-can reject a calibration-frozen finalist but never reorder A2/A3 or discover a new winner. A formal candidate is
-never stopped halfway merely because the wall-time admission budget expired.
+Only after ordered `scheduled_finalists` are frozen does the tuner run them over all 20 held-out
+cases. A candidate is appended to `admitted_finalists` only after every case and requested
+repetition has a complete raw receipt. The same configured quality gate is then evaluated against
+the complete A1 generic baseline. If no finalist passes, profile selection falls back specifically
+to measured A2. Held-out metrics can reject a scheduled finalist but never reorder A2/A3 or
+discover a new winner. A timeout interrupts the candidate, leaves it unadmitted, and fails the
+command; it never produces a truncated formal result.
+
+Strict verification regenerates the candidate set from target topology and the semantic probe
+receipt, recalculates every calibration summary and rank from raw responses, recalculates each
+held-out result and quality gate, and derives selected A3 as the first scheduled passing receipt.
+The optimized profile therefore cannot be changed by editing matching summary fields in both the
+profile and search plan.
 
 ## Commands
 

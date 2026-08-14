@@ -70,7 +70,8 @@ The remaining competition window is short. Complete a valid Devpost draft and re
 
   **Acceptance:**
   - On target, architecture is `aarch64`/`arm64`.
-  - `artifacts/system-info.json` validates.
+  - `artifacts/system-info.json` declares schema version `2.0.0` and validates; missing,
+    v1, and unknown future versions fail closed rather than being migrated implicitly.
   - Relevant DotProd/I8MM/SVE/SME flags are evidence-backed, not guessed.
   - Hostname, username, IP, and home path are redacted in public copy.
 

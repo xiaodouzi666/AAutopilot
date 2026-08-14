@@ -23,6 +23,7 @@ htmlcov/
 /artifacts/raw/
 /artifacts/a4/runs/
 /artifacts/runtime/
+/artifacts/performance-probes-raw/
 /artifacts/tmp/
 /artifacts/*.log
 /artifacts/submission/*-DRAFT.*

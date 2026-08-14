@@ -446,7 +446,7 @@ def _strict_nested_receipt(
         e2e_ms=2.0,
         prompt_tokens=10,
         completion_tokens=20,
-        generation_tok_s=10.0,
+        generation_tok_s=20_000.0,
         peak_rss_mb=100.0,
         route="weak",
         schema_valid=score.schema_valid,
@@ -483,6 +483,7 @@ def _strict_nested_receipt(
             "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
             "seed": REAL_BENCHMARK_SEED,
             "stream": True,
+            "stream_options": {"include_usage": True},
             "response_format": triage_openai_response_format(),
         },
     )

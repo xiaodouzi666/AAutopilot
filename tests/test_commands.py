@@ -109,6 +109,20 @@ def test_runtime_marker_must_come_from_log() -> None:
     ).verified
 
 
+def test_backend_typed_evidence_strips_ambiguous_llama_elapsed_prefix() -> None:
+    result = verify_backend_log(
+        "0.10.168.200 D kleidiai: primary q4 kernel feature DOTPROD\n"
+        "0.10.168.201 I load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB",
+        "kleidiai",
+        quantization="Q4_0",
+    )
+    assert result.verified
+    assert result.evidence == (
+        "kleidiai: primary q4 kernel feature DOTPROD",
+        "load_tensors: CPU_KLEIDIAI model buffer size = 100 MiB",
+    )
+
+
 def test_kleidiai_verifier_rejects_unaccelerated_tensor_warning() -> None:
     log = "\n".join(
         (

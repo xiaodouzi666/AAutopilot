@@ -35,11 +35,13 @@ requires the primary KleidiAI Q4 marker and rejects any additional or different 
 
 The included workload contains 60 original synthetic cloud incidents. The v1 test set was
 executed in failed run6 and used for error analysis, so it is retired from final evaluation.
-Before the next run, split v2 selected 20 final-holdout cases from 36 never-executed candidates
-with a frozen category-stratified hash procedure whose only inputs were category and case ID.
-Only v2 is described as the unseen final holdout; `demo/split-freeze-v2.json` preserves every
-selection input and both split hashes. The agent may request deterministic read-only fixture
-tools; it never executes model-generated shell commands.
+Before its first published evaluation, split v2 selected 20 final-holdout cases from 36
+then-unexecuted candidates with a frozen category-stratified hash procedure whose only inputs were
+category and case ID. It was unseen only before its first formal execution in run `31778419786`;
+later runs using the unchanged frozen membership are replication/revalidation evidence, not newly
+unseen tests. `demo/split-freeze-v2.json` preserves every selection input and both split hashes.
+The agent may request deterministic read-only fixture tools; it never executes model-generated
+shell commands.
 
 ## Why This Matters
 

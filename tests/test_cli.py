@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 import a64pilot.benchmark.cascade as cascade_module
 from a64pilot.cli import _all_run_limit, _fair_run_split, app
-from a64pilot.schemas import SystemInfo
+from a64pilot.schemas import SYSTEM_INFO_SCHEMA_VERSION, SystemInfo
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,11 +34,40 @@ def test_partial_fair_run_is_micro_evidence() -> None:
     assert _fair_run_split(1) == "micro"
 
 
-def test_quick_mode_never_truncates_formal_a1_a2() -> None:
-    assert _all_run_limit("a0", quick=True) == 10
+def test_quick_mode_never_truncates_formal_a0_a1_a2() -> None:
+    assert _all_run_limit("a0", quick=True) is None
     assert _all_run_limit("a1", quick=True) is None
     assert _all_run_limit("a2", quick=True) is None
     assert _all_run_limit("a3", quick=True) == 10
+
+
+def test_bounded_protocol_probe_command_is_exposed() -> None:
+    result = runner.invoke(app, ["benchmark", "probes", "--help"])
+    assert result.exit_code == 0
+    assert "p1/p2 concurrency" in result.stdout
+    assert "--max-minutes" in result.stdout
+
+
+def test_probe_verifier_exposes_private_and_public_roots() -> None:
+    result = runner.invoke(app, ["verify-probes", "--help"])
+    assert result.exit_code == 0
+    assert "--artifacts-dir" in result.stdout
+    assert "--manifest-only" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ["benchmark", "all", "--formal-max-minutes", "nan"],
+        ["benchmark", "quality", "--calibrate", "--max-minutes", "0"],
+    ),
+)
+def test_real_benchmark_phase_budgets_must_be_finite_and_positive(
+    arguments: list[str],
+) -> None:
+    result = runner.invoke(app, arguments)
+    assert result.exit_code == 2
+    assert "finite and positive" in result.output
 
 
 def test_held_out_cli_preflights_before_component_inference(
@@ -108,8 +137,9 @@ def test_held_out_cli_persists_reservation_before_component_inference(
         events.append("reserve")
         return {"status": "held-out-in-progress"}
 
-    def collect(*_args: object, **_kwargs: object) -> object:
+    def collect(*_args: object, **kwargs: object) -> object:
         assert events == ["reserve"]
+        assert isinstance(kwargs.get("deadline"), float)
         events.append("collect")
         return object()
 
@@ -181,6 +211,7 @@ def test_doctor_writes_shared_schema(tmp_path: Path) -> None:
     result = runner.invoke(app, ["doctor", "--json", "--artifacts-dir", str(tmp_path)])
     assert result.exit_code == 0
     payload = json.loads((tmp_path / "system-info.json").read_text(encoding="utf-8"))
+    assert payload["schema_version"] == SYSTEM_INFO_SCHEMA_VERSION
     shared = SystemInfo.model_validate(payload)
     assert shared.architecture in {"aarch64", "x86_64"}
     assert shared.operating_system == platform.system()
@@ -188,3 +219,6 @@ def test_doctor_writes_shared_schema(tmp_path: Path) -> None:
     assert shared.real_benchmark_eligible is (
         shared.architecture == "aarch64" and shared.operating_system == "Linux"
     )
+    if shared.cpu_model == "unknown":
+        assert any(item.field == "cpu_model" for item in shared.provenance_limitations)
+        assert shared.limitations

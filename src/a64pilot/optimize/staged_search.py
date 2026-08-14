@@ -1,4 +1,9 @@
-"""Resumable, wall-clock-bounded staged candidate evaluation."""
+"""Diagnostic-only summary cache for non-formal candidate experiments.
+
+This legacy helper neither owns raw request receipts nor enforces per-inference
+deadlines.  It must not be used for formal A3 admission or deployment selection;
+the evidence-bearing implementation is :func:`a64pilot.optimize.tune.run_bounded_tune`.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,8 @@ Runner = Callable[[BenchmarkCandidate], CandidateResult]
 
 
 class StagedSearch:
+    """Cache measured summaries for diagnostics, never formal evidence."""
+
     def __init__(self, cache_dir: Path | str = "artifacts/search-cache") -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)

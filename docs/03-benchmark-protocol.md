@@ -84,11 +84,47 @@ For each combination:
 - raw stdout/stderr saved;
 - parse only values that match a versioned parser test.
 
+The minimum bounded matrix is not a single preferred configuration. It contains generic Q8_0,
+generic Q4_0, and KleidiAI Q4_0 at two topology-derived thread counts
+(`max(1, physical_threads // 2)` and `physical_threads`, which must be distinct). Each invocation
+runs both `pp128` and `tg64`, keeps the tool's one default warmup, and uses at least three measured
+repetitions. Both binaries must discover and use explicit `--device none`, `-ngl 0`, and exactly
+one canonical `-v` flag so the backend marker remains replayable;
+a missing flag, parser row, runtime backend marker, raw log, or matrix cell invalidates the entire
+supporting artifact. Generic/KleidiAI Q4_0 rows are paired at each thread count, while the generic
+Q8_0/Q4_0 cells provide the minimum quantization ablation.
+
 This stage is ranking evidence, not the final user-facing latency result.
+
+The A3 tuner consumes this verified artifact rather than independently guessing thread counts.
+For KleidiAI Q4_0, rank the complete micro cells by `tg64` tokens/s, then `pp128` tokens/s, then
+thread count. Only these micro-measured thread counts proceed to bounded service calibration. The
+search plan stores the ranking and a redaction-stable semantic probe digest; each private or
+sanitized bundle still verifies its own raw-log hashes independently.
 
 ### 5.3 Service stage
 
 Launch a fresh `llama-server` for each candidate unless testing steady-state concurrency. Measure via the OpenAI-compatible streaming API.
+
+The bounded supporting service matrix uses the same strong Q4_0 checksum and frozen request
+settings for generic and KleidiAI at `parallel=1` and `parallel=2`. Each cell uses a fresh server,
+one unmeasured warmup round, and at least three measured rounds. The p2 server receives twice the
+total context so each concurrent slot retains the same 2048-token capacity as p1. Streaming
+requests explicitly set `stream_options.include_usage=true`; missing positive prompt/completion
+usage or a missing first content token fails closed rather than producing zero/null token rates.
+The supporting workload is one fixed calibration case and is never merged into held-out rows.
+
+Every warmup and measured request retains a hashed request/response receipt. Each measured round
+stores its enclosing monotonic start/end counters and the exact request IDs, repetitions, client
+indices, and generated-token sum. Strict replay requires bidirectional membership, every request
+interval to fall inside its round, and all stored rates/scores/tokens to reproduce from receipts.
+Startup start/readiness counters, a post-readiness idle process-tree RSS sample, the finalized RSS
+CSV peak, process command receipt, and distinct fresh-start ID are likewise mandatory.
+
+Formal A3 calibration remains `parallel=1` because its quality runner sends requests sequentially.
+It must not rank or deploy p2/p4 from single-request latency or label `median(1/E2E)` as aggregate
+concurrency throughput. The independent p1/p2 probe rounds above are the protocol's concurrency
+evidence and preserve equal context per slot.
 
 For each request record:
 
@@ -111,6 +147,12 @@ Run only on the 40 calibration cases. Select:
 - any retry/escalation policy.
 
 Store all calibration results, but keep them visually separate from final held-out claims.
+
+Every calibrated candidate requires an exact receipt over the frozen calibration prefix and all
+requested repetitions. Resume reuses only a receipt whose cited run IDs replay to that exact raw
+matrix and exact candidate settings. Partial or unreceipted raw data stops the search; it is not
+silently rerun. The wall-clock deadline is an absolute monotonic deadline propagated into server
+startup and each request, not merely a check between candidates.
 
 The authoritative final split is `demo/split.json` schema version 2.0. It was frozen before
 the next final run using the following preregistered procedure:
@@ -141,14 +183,31 @@ safety labels, model outputs, quality scores, latency, or any other run result.
 
 Freeze all decisions before running the 20 held-out cases. Evaluate the five ablation stages with at least three repetitions per case where time permits. A minimum reduced run may use one quality repetition plus repeated performance probes, but the report must disclose this.
 
-Do not change thresholds after viewing held-out labels.
+For the deadline-safe reduced run, A0, A1, and A2 still cover all 20 held-out cases once; quick
+mode may reduce only calibration search depth, never those formal ablations or admitted A3
+finalists. The report states the exact formal quality repetitions per case and separately labels
+the three-or-more-round micro/service probes as supporting ranking/concurrency evidence. Probe
+rows cannot increase the formal held-out sample count or support the preregistered headline claim.
+
+The official reduced workflow composes explicit phase budgets: 20 minutes for supporting probes,
+35 minutes for the complete A0–A2 formal phase, 45 minutes for A3 search, and 30 minutes each for
+A4 calibration and frozen-policy replay. Each phase passes one absolute monotonic deadline through
+capability discovery, server startup, warmup, and every request; the 240-minute Actions job timeout
+is only an outer safety margin, not the primary stopping mechanism. An incomplete phase fails
+closed and cannot emit an admitted candidate or publication artifact.
+
+Do not change thresholds after viewing held-out labels. Freeze the ordered
+`scheduled_finalists` before this phase. Write a candidate to `admitted_finalists` only after its
+entire 20-case by repetition matrix completes and its raw-derived gate receipt is stored. Any
+timeout or execution failure leaves it unadmitted and fails the tuning command closed.
 
 The v1 test set was executed in failed Arm run `31758292648` (`run6`) and then used for error
 analysis, so it is calibration evidence and must never again be described as unseen or final
-held-out evidence. Split v2 was frozen after that analysis and before the next run. Only the
-v2 test cases may be described as the unseen final holdout, meaning they had not previously
-been executed or inspected through run outputs; the source dataset itself is public, so this
-is not a claim that the case text or labels are secret.
+held-out evidence. Split v2 was frozen after that analysis and before its first formal use in
+published run `31778419786`. The upcoming run keeps split v2 and the preregistered primary
+definition unchanged, but it is a replication/revalidation on a previously executed test split,
+not a newly unseen holdout. Reports must disclose that history and must not use held-out outcomes
+to reorder the calibration-frozen finalists.
 
 ## 6. Baselines and ablations
 
@@ -252,6 +311,17 @@ Run bounded concurrent clients matching tested server parallel slots. Report:
 - p50/p95 request latency;
 - error rate.
 
+For every measured round, compute completed requests/s and aggregate generated tokens/s from one
+shared monotonic wall interval. Also retain each request's TTFT, E2E, completion-token count, and
+`completion_tokens / (response_end - first_content_token)` generation rate. The p1/p2 report shows
+round mean and standard deviation plus request-level p50/p95 latency and fresh startup time.
+
+`a64pilot verify-probes` reparses raw micro tables, service receipts, process/RSS evidence, CPU-only
+configuration, and generic/KleidiAI markers; it binds binary/model hashes and inventories to the
+build/model manifests. After redaction normalizes native elapsed prefixes and refreshes raw hashes,
+the sanitized bundle must pass the same semantic replay in manifest-only public mode before it is
+packaged. The private on-target gate additionally rehashes current binaries and model files.
+
 Do not compare concurrency results at different quality/output limits without labeling them.
 
 ### Memory
@@ -260,7 +330,8 @@ Sample RSS for the full process tree. Report:
 
 - idle resident memory after model load;
 - peak RSS during requests;
-- combined peak for both weak and strong servers in cascade mode;
+- combined peak for both weak and strong servers in cascade mode, or explicitly `not measured / not
+  eligible` when only component quality replay exists;
 - model file bytes separately.
 
 ### Relative change
@@ -286,9 +357,10 @@ Do not use “X% faster” ambiguously; label the exact metric.
 - Pair requests by case and repetition.
 - Report median and p95 for latency.
 - Report mean and standard deviation for token rates where conventional.
-- For the complete A1 generic-Q4_0/A2 KleidiAI-Q4_0 pair, prospectively preregister mean
-  time-to-first-token reduction as the single primary metric on unseen split v2. Also
-  preregister p95 end-to-end latency reduction and median per-request throughput increase
+- For the complete A1 generic-Q4_0/A2 KleidiAI-Q4_0 pair, preserve mean time-to-first-token
+  reduction as the single primary metric prospectively preregistered before split v2's first
+  formal run. Unchanged-split replications must disclose its prior execution. Also retain p95
+  end-to-end latency reduction and median per-request throughput increase
   (where per-request throughput is `1000 / E2E_ms`) as transparent secondary metrics.
 - Compute a paired 95% bootstrap confidence interval for each of those three metrics using
   the same complete 20-case paired rows, 5,000 resamples, and seed `20260813`. Use the mean,

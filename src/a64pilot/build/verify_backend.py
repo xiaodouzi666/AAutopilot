@@ -33,6 +33,11 @@ _KLEIDIAI_MODEL_BUFFER_MARKER = re.compile(
     r"\bCPU_KLEIDIAI\s+model\s+buffer\s+size\b", re.IGNORECASE
 )
 
+# Verbose llama.cpp logs use ``minutes.seconds.milliseconds.microseconds LEVEL``.
+# That token is lexically indistinguishable from some IPv4 addresses, so never copy
+# it into typed JSON evidence. The full native log remains separately hashed.
+_LLAMA_ELAPSED_LOG_PREFIX = re.compile(r"^(?:0|[1-9]\d{0,2})\.[0-5]\d\.\d{3}\.\d{3} [DIWE] ")
+
 _REVIEWED_Q6_K_FALLBACK = re.compile(
     r"\bkleidiai:\s+no\s+kernel\s+for\s+tensor\s+type\s+Q6_K,\s+"
     r"not\s+accelerated\s+by\s+KleidiAI\s+"
@@ -146,7 +151,8 @@ def _matching_lines(text: str, patterns: Sequence[re.Pattern[str]]) -> tuple[str
     lines: list[str] = []
     for line in text.splitlines():
         if any(pattern.search(line) for pattern in patterns):
-            lines.append(line.strip()[:500])
+            normalized = _LLAMA_ELAPSED_LOG_PREFIX.sub("", line.strip(), count=1)
+            lines.append(normalized[:500])
     return tuple(lines)
 
 

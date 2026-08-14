@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -12,6 +13,71 @@ from typing import Any
 from a64pilot.schemas import BenchmarkRecord, Claim
 
 _RUN_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+
+_REPORT_INTEGRITY_REQUIRED = {
+    "benchmark-results.json",
+    "claims.json",
+    "report-data.json",
+    "report.html",
+    "report.md",
+}
+
+
+def verify_report_integrity(artifacts_dir: Path | str = Path("artifacts")) -> list[str]:
+    """Verify rendered report bytes and their embedded target provenance."""
+
+    from a64pilot.schemas import SystemInfo
+
+    root = Path(artifacts_dir).resolve()
+    manifest_path = root / "report-integrity.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return [f"invalid or missing report-integrity.json: {type(exc).__name__}"]
+    if not isinstance(manifest, dict) or any(
+        not isinstance(name, str) or not isinstance(digest, str)
+        for name, digest in manifest.items()
+    ):
+        return ["report-integrity.json must be a string-to-string object"]
+
+    expected = set(_REPORT_INTEGRITY_REQUIRED)
+    if (root / "performance-probes.json").is_file():
+        expected.add("performance-probes.json")
+    errors: list[str] = []
+    if set(manifest) != expected:
+        missing = sorted(expected.difference(manifest))
+        extra = sorted(set(manifest).difference(expected))
+        if missing:
+            errors.append("report integrity manifest is missing: " + ", ".join(missing))
+        if extra:
+            errors.append("report integrity manifest has unexpected paths: " + ", ".join(extra))
+    for name in sorted(expected.intersection(manifest)):
+        if Path(name).is_absolute() or ".." in Path(name).parts or Path(name).name != name:
+            errors.append(f"unsafe report integrity path: {name}")
+            continue
+        path = root / name
+        try:
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            errors.append(f"missing report integrity file {name}: {type(exc).__name__}")
+            continue
+        wanted = manifest[name]
+        if not re.fullmatch(r"[0-9a-f]{64}", wanted):
+            errors.append(f"invalid report integrity digest: {name}")
+        elif actual != wanted:
+            errors.append(f"report integrity digest mismatch: {name}")
+
+    try:
+        target = SystemInfo.model_validate_json(
+            (root / "system-info.json").read_text(encoding="utf-8")
+        ).model_dump(mode="json")
+        report_data = json.loads((root / "report-data.json").read_text(encoding="utf-8"))
+        embedded = SystemInfo.model_validate(report_data["system"]).model_dump(mode="json")
+        if embedded != target:
+            errors.append("report-data system manifest disagrees with system-info.json")
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        errors.append(f"report target provenance replay failed: {type(exc).__name__}")
+    return errors
 
 
 def _option_value(command: list[str], *names: str) -> str | None:
@@ -95,7 +161,12 @@ def validate_evidence_bundle(
     from a64pilot.models.registry import default_registry
     from a64pilot.provenance import sha256_file
     from a64pilot.runtime.llama_command import inspect_llama_server_capabilities
-    from a64pilot.schemas import BuildManifest, ModelManifest, SystemInfo
+    from a64pilot.schemas import (
+        SYSTEM_INFO_SCHEMA_VERSION,
+        BuildManifest,
+        ModelManifest,
+        SystemInfo,
+    )
 
     artifacts = Path(artifacts_dir).resolve()
     project_root = artifacts.parent
@@ -116,10 +187,23 @@ def validate_evidence_bundle(
     build = None
     models = None
     if system_payload is not None:
-        try:
-            system = SystemInfo.model_validate(system_payload)
-        except Exception as exc:
-            errors.append(f"system manifest schema: {type(exc).__name__}")
+        system_schema_version = (
+            system_payload.get("schema_version") if isinstance(system_payload, dict) else None
+        )
+        if system_schema_version is None:
+            errors.append(
+                f"system manifest schema version is missing; expected {SYSTEM_INFO_SCHEMA_VERSION}"
+            )
+        elif system_schema_version != SYSTEM_INFO_SCHEMA_VERSION:
+            errors.append(
+                "system manifest schema version is unsupported; "
+                f"expected {SYSTEM_INFO_SCHEMA_VERSION}"
+            )
+        else:
+            try:
+                system = SystemInfo.model_validate(system_payload)
+            except Exception as exc:
+                errors.append(f"system manifest schema: {type(exc).__name__}")
     if build_payload is not None:
         try:
             build = BuildManifest.model_validate(build_payload)
@@ -143,9 +227,29 @@ def validate_evidence_bundle(
             or not current_system.real_benchmark_eligible
         ):
             errors.append("strict verification is not running on an eligible Arm64 Linux host")
-        for field_name in ("architecture", "operating_system", "kernel", "logical_cores"):
+        for field_name in (
+            "architecture",
+            "operating_system",
+            "kernel",
+            "logical_cores",
+            "physical_cores",
+            "memory_bytes",
+            "cpu_model",
+            "cpu_identifiers",
+            "distribution",
+            "features",
+            "topology",
+            "affinity_candidates",
+            "sockets",
+            "numa_nodes",
+            "cache_layout",
+            "provenance_limitations",
+            "target_provenance_status",
+        ):
             if getattr(current_system, field_name) != getattr(system, field_name):
                 errors.append(f"system manifest disagrees with current host: {field_name}")
+        if current_system.tool_versions.get("compiler") != system.tool_versions.get("compiler"):
+            errors.append("system manifest disagrees with current host: compiler")
     if build is not None:
         try:
             source_lock = read_source_lock(project_root / "third_party/llama.cpp.lock")
@@ -585,6 +689,7 @@ def validate_evidence_bundle(
                 "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
                 "seed": 20260813,
                 "stream": True,
+                "stream_options": {"include_usage": True},
             }
             for key, expected in fixed_request_settings.items():
                 actual = request_payload.get(key)
@@ -604,6 +709,25 @@ def validate_evidence_bundle(
                 errors.append(f"{prefix} score issues disagree with response replay")
             if response_payload.get("score") != replay_score.as_dict():
                 errors.append(f"{prefix} stored score does not replay")
+
+        usage = response_payload.get("usage")
+        if not isinstance(usage, dict):
+            errors.append(f"{prefix} response token usage is missing")
+        else:
+            prompt_tokens = usage.get("prompt_tokens")
+            completion_tokens = usage.get("completion_tokens")
+            if (
+                type(prompt_tokens) is not int
+                or prompt_tokens <= 0
+                or prompt_tokens != record.prompt_tokens
+            ):
+                errors.append(f"{prefix} prompt token usage is missing or disagrees")
+            if (
+                type(completion_tokens) is not int
+                or completion_tokens <= 0
+                or completion_tokens != record.completion_tokens
+            ):
+                errors.append(f"{prefix} completion token usage is missing or disagrees")
 
         timing = response_payload.get("timing")
         if not isinstance(timing, dict):
@@ -629,6 +753,71 @@ def validate_evidence_bundle(
             derived_ttft_ms = (record.first_token_ns - record.start_ns) / 1_000_000
             if record.ttft_ms is None or abs(derived_ttft_ms - record.ttft_ms) > 1e-6:
                 errors.append(f"{prefix} ttft_ms does not match monotonic timestamps")
+            decode_seconds = (record.end_ns - record.first_token_ns) / 1_000_000_000
+            derived_generation_rate = (
+                record.completion_tokens / decode_seconds if decode_seconds > 0 else None
+            )
+            if (
+                derived_generation_rate is None
+                or record.generation_tok_s is None
+                or record.generation_tok_s <= 0
+                or abs(derived_generation_rate - record.generation_tok_s) > 1e-6
+            ):
+                errors.append(f"{prefix} generation_tok_s does not replay from token usage")
+
+    search_plan_path = artifacts / "search-plan.json"
+    if search_plan_path.is_file():
+        try:
+            from a64pilot.benchmark.probes import (
+                load_performance_probes,
+                performance_probe_semantic_sha256,
+            )
+            from a64pilot.optimize.replay import verify_search_plan
+            from a64pilot.settings import load_settings
+
+            plan_payload = json.loads(search_plan_path.read_text(encoding="utf-8"))
+            if not isinstance(plan_payload, dict):
+                raise ValueError("search plan root is not a mapping")
+            if system is None or split is None:
+                raise ValueError("verified system/split evidence is unavailable")
+            allowed_cpus = system.topology.get("allowed_cpus")
+            if not isinstance(allowed_cpus, list) or not all(
+                type(cpu) is int and cpu >= 0 for cpu in allowed_cpus
+            ):
+                raise ValueError("system topology has no verified allowed CPU list")
+            probes = load_performance_probes(artifacts / "performance-probes.json")
+            if build is None:
+                raise ValueError("verified build evidence is unavailable")
+            kleidiai_variants = [
+                variant for variant in build.variants if variant.backend == "kleidiai"
+            ]
+            if len(kleidiai_variants) != 1:
+                raise ValueError("verified KleidiAI build is unavailable")
+            binary_hash = kleidiai_variants[0].binary_sha256.get("llama-server")
+            if not isinstance(binary_hash, str):
+                raise ValueError("verified KleidiAI server hash is unavailable")
+            if not isinstance(expected_dataset_hashes, dict):
+                raise ValueError("verified dataset hashes are unavailable")
+            errors.extend(
+                verify_search_plan(
+                    plan_payload,
+                    records,
+                    probes=probes,
+                    probe_semantic_sha256=performance_probe_semantic_sha256(probes),
+                    architecture=system.architecture,
+                    logical_cpus=system.logical_cores,
+                    physical_cores=system.physical_cores,
+                    allowed_cpus=allowed_cpus,
+                    calibration_case_ids=split.calibration,
+                    test_case_ids=split.test,
+                    gate=load_settings(project_root / "configs/default.yaml").quality_gate,
+                    binary_sha256=binary_hash,
+                    cases_sha256=expected_dataset_hashes["cases_sha256"],
+                    split_sha256=expected_dataset_hashes["split_sha256"],
+                )
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            errors.append(f"search plan strict replay: {type(exc).__name__}: {exc}")
     return records, errors
 
 

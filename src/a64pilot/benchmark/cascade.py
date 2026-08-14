@@ -376,6 +376,7 @@ def _load_measured_outputs(
             "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
             "seed": REAL_BENCHMARK_SEED,
             "stream": True,
+            "stream_options": {"include_usage": True},
             "response_format": triage_openai_response_format(),
         }
         if request != expected_request:
@@ -437,6 +438,7 @@ def collect_real_component_outputs(
     cases_path: Path | str = "demo/cases.jsonl",
     split_path: Path | str = "demo/split.json",
     build_manifest_path: Path | str = "artifacts/build-manifest.json",
+    deadline: float | None = None,
 ) -> CascadeComponentEvidence:
     """Run verified real model components once per case on the named split."""
 
@@ -468,6 +470,7 @@ def collect_real_component_outputs(
             split=split,
             repetitions=1,
             warmups=component_warmups,
+            deadline=deadline,
         )
         weak_collection = _load_measured_outputs(
             benchmark.store,
@@ -489,6 +492,7 @@ def collect_real_component_outputs(
         split=split,
         repetitions=1,
         warmups=component_warmups,
+        deadline=deadline,
     )
     strong_collection = _load_measured_outputs(
         benchmark.store,

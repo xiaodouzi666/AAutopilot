@@ -4,6 +4,32 @@
 
 **Frozen workload:** cases `{{ cases_sha256[:12] }}…`; split schema v{{ split_schema_version }} `{{ split_sha256[:12] }}…`.
 
+## Target provenance
+
+{% if system is defined and system %}
+- **Architecture:** `{{ system.get("architecture", "not exposed") }}`
+- **CPU model:** `{{ system.get("cpu_model", "not exposed") }}`
+- **Distribution:** {{ (system.get("distribution") or {}).get("pretty_name", "not exposed") }}
+- **Kernel:** `{{ system.get("kernel", "not exposed") }}`
+- **Topology:** {{ system.get("physical_cores", "not exposed") }} physical / {{ system.get("logical_cores", "not exposed") }} logical cores; {{ system.get("sockets", "not exposed") }} socket(s); {{ system.get("numa_nodes", "not exposed") }} NUMA node(s)
+- **Memory:** {{ system.get("memory_bytes", "not exposed") }} bytes
+- **Compiler:** `{{ system.get("tool_versions", {}).get("compiler", "not exposed") }}`
+{% for cache in system.get("cache_layout", []) %}- **{{ cache.get("name", "cache")|upper }}:** {{ cache.get("total_size_bytes", "not exposed") }} bytes across {{ cache.get("instances", "not exposed") }} instance(s), from {{ cache.get("source", "unknown source") }}
+{% endfor %}
+{% if system.get("target_provenance_status") == "complete" %}
+The validated SystemInfo v2 schema marks target provenance complete: CPU model, distribution,
+physical cores, memory, compiler, socket, NUMA, L1d/L1i/L2/L3 caches, instruction-feature
+evidence, per-core topology, and affinity candidates were exposed.
+{% else %}
+Validated SystemInfo v2 status: **limited**.
+
+{% for item in system.get("provenance_limitations", []) %}- `{{ item.get("code", "unknown") }}` (`{{ item.get("field", "unknown") }}`): {{ item.get("reason", "no reason recorded") }}
+{% endfor %}
+{% endif %}
+{% else %}
+No target manifest is available; performance evidence remains pending.
+{% endif %}
+
 ## Preregistered outcomes
 
 {% if claims %}
@@ -27,6 +53,85 @@ No performance claim is available. Complete the fair same-machine Arm64 Linux ge
 {% if not summaries %}| _none_ | measurement pending | — | 0 | — | — | — | — | — |
 {% endif %}
 
+## Supporting protocol probes
+
+{% if formal_repetitions_per_case is defined and formal_repetitions_per_case %}
+The formal fair A1/A2 holdout used **{{ formal_repetitions_per_case }} quality repetition(s) per
+case**. {% if formal_repetitions_per_case == 1 %}This is the protocol's disclosed reduced-run
+design: one quality repetition on each of 20 frozen holdout cases, supplemented by the independent
+three-or-more-round performance probes below.{% else %}The formal run itself used repeated quality
+measurements; the probes below remain separate supporting evidence.{% endif %}
+{% if formal_sample_disclosure is defined and formal_sample_disclosure %}
+Formal sample disclosure: **{{ formal_sample_disclosure.paired_case_count }} paired cases,
+{{ formal_sample_disclosure.measured_rows }} / {{ formal_sample_disclosure.expected_rows }} expected
+A1/A2 rows, {{ formal_sample_disclosure.failed_or_missing_rows }} failed or missing rows**. Missing
+or failed rows cannot be silently excluded: an incomplete pair fails the claim/report gate.
+{% endif %}
+{% else %}
+Formal quality repetition count is pending.
+{% endif %}
+
+{% if performance_probes is defined and performance_probes %}
+This artifact is **supporting ranking/concurrency evidence, not a held-out headline claim**. It used
+{{ performance_probes.repetitions }} measured repetitions/rounds, two topology-derived thread
+values ({{ performance_probes.micro_threads|join(", ") }}), one fixed calibration case
+(`{{ performance_probes.case_id }}`), fresh server startups, explicit CPU-only flags, and identical
+Q4_0 settings across generic/KleidiAI pairs. The probe artifact carries a complete raw-file
+integrity manifest that is refreshed after public redaction.
+
+Semantic replay status: **{{ performance_probes.semantic_replay_verified }}**; canonical
+measurement fingerprint `{{ performance_probes.semantic_sha256 }}`. Samples: {{
+performance_probes.micro_cells }} micro cells / {{ performance_probes.micro_underlying_measurements
+}} underlying pp/tg measurements, {{ performance_probes.service_rounds }} service rounds / {{
+performance_probes.service_requests }} measured requests. Recorded failures: {{
+performance_probes.failed_micro_cells }} micro cells and {{
+performance_probes.failed_service_rounds }} service rounds; any failure prevents publication of a
+complete probe artifact.
+
+{% if probe_provenance is defined and probe_provenance %}
+### Build and model provenance
+
+llama.cpp source: `{{ probe_provenance.source_url }}` at commit
+`{{ probe_provenance.source_commit }}`.
+
+| Build | CPU-only configured | KleidiAI configured | KleidiAI runtime proof | llama-bench SHA-256 | llama-server SHA-256 |
+|---|---:|---:|---:|---|---|
+{% for row in probe_provenance.build_variants %}| {{ row.backend }} | {{ row.cpu_only_configured }} | {{ row.kleidiai_configured }} | {{ row.runtime_marker_verified }} | `{{ row.llama_bench_sha256 }}` | `{{ row.llama_server_sha256 }}` |
+{% endfor %}
+
+| Model | Quant | Exact bytes | SHA-256 | Tensor inventory SHA-256 |
+|---|---|---:|---|---|
+{% for row in probe_provenance.models %}| `{{ row.filename }}` | {{ row.quantization }} | {{ row.bytes }} | `{{ row.sha256 }}` | `{{ row.tensor_inventory_sha256 }}` |
+{% endfor %}
+{% endif %}
+
+### Microbenchmark matrix
+
+| Backend | Quant | Threads | Test | n | tokens/s mean | tokens/s stddev |
+|---|---|---:|---|---:|---:|---:|
+{% for row in performance_probes.micro %}| {{ row.backend }} | {{ row.quantization }} | {{ row.threads }} | {{ row.test }} | {{ row.repetitions }} | {{ "%.2f"|format(row.tokens_per_second) }} | {{ "%.2f"|format(row.tokens_per_second_stddev) }} |
+{% endfor %}
+
+### Fresh-start p1/p2 service probes
+
+| Backend | p | Startup ms | Rounds / requests | Prompt / completion tokens | req/s mean ± sd | generated tok/s mean ± sd | Per-request gen tok/s mean ± sd | TTFT p50/p95 ms | E2E p50/p95 ms | Idle / peak RSS MiB | Context total/per slot |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+{% for row in performance_probes.service %}| {{ row.backend }} | {{ row.parallel }} | {{ "%.2f"|format(row.startup_ms) }} | {{ row.rounds }} / {{ row.requests }} | {{ row.prompt_tokens_total }} / {{ row.completion_tokens_total }} | {{ "%.3f"|format(row.requests_per_second_mean) }} ± {{ "%.3f"|format(row.requests_per_second_stddev) }} | {{ "%.2f"|format(row.generated_tokens_per_second_mean) }} ± {{ "%.2f"|format(row.generated_tokens_per_second_stddev) }} | {{ "%.2f"|format(row.request_generation_tok_s_mean) }} ± {{ "%.2f"|format(row.request_generation_tok_s_stddev) }} | {{ "%.2f"|format(row.ttft_p50_ms) }} / {{ "%.2f"|format(row.ttft_p95_ms) }} | {{ "%.2f"|format(row.e2e_p50_ms) }} / {{ "%.2f"|format(row.e2e_p95_ms) }} | {{ "%.1f"|format(row.idle_rss_mb) }} / {{ "%.1f"|format(row.peak_rss_mb) }} | {{ row.context_total }} / {{ row.context_per_slot }} |
+{% endfor %}
+
+For p2, total server context is doubled so the effective 2048-token capacity per request is the
+same as p1. Completed requests/s and aggregate generated tokens/s use each measured round's wall
+clock; per-request generation rate is replayed from completion-token usage and monotonic decode
+time. Any missing usage, first token, schema/safety pass, raw hash, or matrix cell fails closed.
+
+Exact reproduction commands:
+
+{% for command in performance_probes.reproduction_commands %}- `{{ command }}`
+{% endfor %}
+{% else %}
+Supporting micro/startup/token/p1/p2 evidence is pending and contributes no claim.
+{% endif %}
+
 ## A4 quality-gated cascade
 
 {% if cascade_status is defined and cascade_status %}
@@ -39,7 +144,9 @@ Held-out route distribution: weak {{ "%.2f"|format(cascade_quality["held_out"]["
 
 This A4 result is measured quality/routing evidence only. Its component replay is explicitly ineligible for live-cascade latency, throughput, or combined-memory claims.
 
-{{ cascade_quality["held_out"].get("evaluation_design", "This split is separate from calibration but is not presented as newly unseen evidence beyond its recorded provenance.") }}
+Live A4 combined RSS is **not measured and not eligible** for a report claim.
+
+{{ cascade_quality["held_out"].get("evaluation_design", "This is an unchanged-split replication/revalidation and is not presented as unseen or newly held-out evidence.") }}
 {% endif %}
 {% else %}
 A4 has not been calibrated. The measured strong-only profile remains the shipping fallback.
@@ -50,14 +157,13 @@ A4 has not been calibrated. The measured strong-only profile remains the shippin
 The fair Arm-specific comparison holds the target, source commit, official Q4_0 model checksum, prompt set, sampling, affinity, threads, batch, micro-batch, concurrency, and lifecycle constant. The intended variable is only the generic versus KleidiAI CPU backend. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K `output.weight`; that single fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. CPU-only proof and the primary KleidiAI Q4 marker are required, and any additional or different fallback is rejected.
 
 Split v1's test cases were executed during failed run6 and then used for error analysis, so they
-are retired from final evaluation. Before the next run, split v2 selected 20 final-holdout cases
-from the 36 never-executed candidates by a frozen stratified hash procedure whose only inputs were
-`category` and `case_id`. Only split v2 is described as the unseen final holdout; its complete
-audit manifest is `demo/split-freeze-v2.json`.
+are retired from final evaluation. Split v2 keeps its frozen 20-case membership and primary
+definition. This cycle is an unchanged-split replication/revalidation, not unseen or newly
+held-out evidence; its complete audit manifest is `demo/split-freeze-v2.json`.
 
 Mean TTFT reduction is the prospectively registered primary outcome. P95 end-to-end latency
 reduction and median per-request throughput increase are transparent secondary outcomes. All
-three are rendered from the same 20 paired cases (40 formal A1/A2 source rows); only a positive
+three are rendered from the same {{ formal_sample_disclosure.paired_case_count if formal_sample_disclosure is defined and formal_sample_disclosure else 20 }} paired cases ({{ formal_sample_disclosure.measured_rows if formal_sample_disclosure is defined and formal_sample_disclosure else "the recorded" }} formal A1/A2 source rows); only a positive
 primary interval whose lower bound exceeds zero can unlock final publication.
 
 The submitted API profile remains strong-only until a separately measured live-cascade performance

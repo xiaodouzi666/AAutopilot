@@ -438,6 +438,40 @@ async def test_runtime_openai_client_measures_stream_without_inventing_nonstream
 
 
 @pytest.mark.asyncio
+async def test_runtime_stream_explicitly_requests_and_captures_usage() -> None:
+    captured: list[dict[str, object]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        body = (
+            'data: {"id":"usage-test","model":"fixture","choices":'
+            '[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n'
+            'data: {"id":"usage-test","model":"fixture","choices":[],"usage":'
+            '{"prompt_tokens":7,"completion_tokens":2,"total_tokens":9}}\n\n'
+            "data: [DONE]\n\n"
+        )
+        return httpx.Response(200, text=body, headers={"content-type": "text/event-stream"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        client = OpenAIClient("http://fixture", client=http_client)
+        completion = await client.chat_completion(
+            messages=[{"role": "user", "content": "synthetic incident"}],
+            model="fixture",
+            stream=True,
+            stream_include_usage=True,
+        )
+
+    assert captured[0]["stream_options"] == {"include_usage": True}
+    assert completion.usage == {
+        "prompt_tokens": 7,
+        "completion_tokens": 2,
+        "total_tokens": 9,
+    }
+    assert completion.generation_tokens_per_second is not None
+
+
+@pytest.mark.asyncio
 async def test_runtime_openai_client_does_not_reuse_completed_sse_connections() -> None:
     accepted_peers: list[tuple[str, int]] = []
     connection_headers: list[str | None] = []

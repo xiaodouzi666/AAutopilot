@@ -63,6 +63,8 @@ def _summarize(
     expected_split: str,
     minimum_safety_score: float,
     maximum_schema_failures: int,
+    expected_case_ids: Sequence[str] | None = None,
+    repetitions: int | None = None,
 ) -> SearchEvaluation:
     rows = list(records)
     reasons: list[str] = []
@@ -78,6 +80,15 @@ def _summarize(
         reasons.append("rows lack verified KleidiAI execution")
     if any(not row.cpu_only_verified for row in rows):
         reasons.append("rows lack CPU-only verification")
+    if expected_case_ids is not None and repetitions is not None:
+        expected_keys = {
+            (case_id, repetition)
+            for repetition in range(repetitions)
+            for case_id in expected_case_ids
+        }
+        actual_keys = [(row.case_id, row.repetition) for row in rows]
+        if set(actual_keys) != expected_keys or len(actual_keys) != len(set(actual_keys)):
+            reasons.append("rows do not exactly cover the frozen case/repetition matrix")
     schema_failures = sum(not row.schema_valid for row in rows)
     if schema_failures > maximum_schema_failures:
         reasons.append(f"schema failures {schema_failures} > allowed {maximum_schema_failures}")
@@ -98,8 +109,49 @@ def _summarize(
         peak_rss_mb=max((row.peak_rss_mb for row in rows), default=None),
         feasible=not reasons,
         reasons=tuple(reasons),
-        source_run_ids=tuple(row.run_id for row in rows),
+        source_run_ids=tuple(sorted(row.run_id for row in rows)),
     )
+
+
+def validate_candidate_records(
+    candidate: BenchmarkCandidate,
+    records: Sequence[BenchmarkRecord],
+    *,
+    expected_split: str,
+    expected_case_ids: Sequence[str],
+    repetitions: int,
+) -> list[str]:
+    """Validate exact candidate settings and complete case/repetition coverage."""
+
+    rows = list(records)
+    errors: list[str] = []
+    expected_keys = {
+        (case_id, repetition) for repetition in range(repetitions) for case_id in expected_case_ids
+    }
+    actual_keys = [(row.case_id, row.repetition) for row in rows]
+    if set(actual_keys) != expected_keys or len(actual_keys) != len(set(actual_keys)):
+        errors.append("rows do not exactly cover the frozen case/repetition matrix")
+    expected = {
+        "candidate_id": candidate.candidate_id,
+        "stage": candidate.stage,
+        "backend": candidate.backend,
+        "model_role": candidate.model_role,
+        "quantization": candidate.quantization,
+        "threads": candidate.threads,
+        "batch": candidate.batch,
+        "ubatch": candidate.ubatch,
+        "parallel": candidate.parallel,
+        "context": candidate.context,
+        "affinity": list(candidate.affinity),
+        "split": expected_split,
+        "evidence_kind": "measured",
+    }
+    for field_name, value in expected.items():
+        if any(getattr(row, field_name) != value for row in rows):
+            errors.append(f"rows disagree with candidate {field_name}")
+    if any(not row.cpu_only_verified or not row.kleidiai_verified for row in rows):
+        errors.append("rows lack verified CPU-only KleidiAI execution")
+    return errors
 
 
 def rank_calibration_candidates(
@@ -110,6 +162,8 @@ def rank_calibration_candidates(
     max_quality_drop: float,
     minimum_safety_score: float,
     maximum_schema_failures: int,
+    expected_case_ids: Sequence[str] | None = None,
+    repetitions: int | None = None,
 ) -> tuple[list[SearchEvaluation], list[str]]:
     """Apply calibration-only safety/quality gates and rank feasible finalists."""
 
@@ -121,6 +175,8 @@ def rank_calibration_candidates(
             expected_split="calibration",
             minimum_safety_score=minimum_safety_score,
             maximum_schema_failures=maximum_schema_failures,
+            expected_case_ids=expected_case_ids,
+            repetitions=repetitions,
         )
         for candidate in candidates
     ]
@@ -156,7 +212,7 @@ def rank_calibration_candidates(
 def candidate_result_from_records(records: Sequence[BenchmarkRecord]) -> CandidateResult:
     """Convert one homogeneous formal-test record group to the quality-gate type."""
 
-    rows = list(records)
+    rows = sorted(records, key=lambda row: (row.repetition, row.case_id, row.run_id))
     if not rows:
         raise ValueError("cannot summarize an empty candidate record group")
     first = rows[0]
@@ -292,4 +348,5 @@ __all__ = [
     "candidate_result_from_records",
     "rank_calibration_candidates",
     "select_frozen_deployment",
+    "validate_candidate_records",
 ]

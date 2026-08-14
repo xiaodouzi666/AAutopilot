@@ -158,6 +158,7 @@ class OpenAIClient:
         stream: bool,
         response_format: Mapping[str, Any] | None,
         stop: str | Sequence[str] | None,
+        stream_include_usage: bool,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model,
@@ -173,6 +174,14 @@ class OpenAIClient:
             payload["response_format"] = dict(response_format)
         if stop is not None:
             payload["stop"] = list(stop) if not isinstance(stop, str) else stop
+        if stream_include_usage:
+            if not stream:
+                raise ValueError("stream_include_usage requires stream=True")
+            # The pinned llama-server implements the OpenAI streaming usage
+            # trailer only when this option is requested.  Benchmark callers
+            # opt in explicitly so completion-token and generation-rate fields
+            # cannot silently collapse to zero.
+            payload["stream_options"] = {"include_usage": True}
         return payload
 
     async def chat_completion(
@@ -187,6 +196,7 @@ class OpenAIClient:
         stream: bool = False,
         response_format: Mapping[str, Any] | None = None,
         stop: str | Sequence[str] | None = None,
+        stream_include_usage: bool = False,
     ) -> ClientCompletion:
         if not messages:
             raise ValueError("messages must not be empty")
@@ -202,6 +212,7 @@ class OpenAIClient:
             stream=stream,
             response_format=response_format,
             stop=stop,
+            stream_include_usage=stream_include_usage,
         )
         if stream:
             return await self._stream(payload)

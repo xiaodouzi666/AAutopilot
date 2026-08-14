@@ -1,7 +1,7 @@
 # Final Submission Checklist
 
-This file is the reusable preflight. The evidence-backed state for the current entry, including
-public URLs and the one still-open receipt item, is `artifacts/submission-checklist.md`.
+This file is the reusable preflight. The completed, evidence-backed state for the current entry,
+including public URLs and the verified submission receipt, is `artifacts/submission-checklist.md`.
 
 ## Eligibility and accounts
 

@@ -151,13 +151,23 @@ The system shall measure:
 - generation tokens per second;
 - requests per second under bounded concurrency;
 - p50 and p95 latency;
-- peak resident memory;
+- post-readiness idle and peak resident memory;
 - quality score;
 - safety score;
 - weak/strong route share;
 - repeated-run dispersion or confidence intervals.
 
 **Acceptance:** raw per-request rows and summarized CSV/JSON are both present and internally consistent.
+
+The minimum deadline-safe implementation may use one formal quality repetition per held-out case
+only when it also emits a separate fail-closed supporting artifact with at least three measured
+micro/service repetitions. That artifact must cover generic Q8_0, generic Q4_0, and KleidiAI Q4_0
+at two topology-derived thread counts, plus fresh-start Q4_0 p1/p2 concurrency for both backends.
+It must preserve equal per-request context, request streaming usage explicitly, and never be
+counted as extra held-out or headline-claim rows. Strict verification reparses every
+`llama-bench` stdout table, request/response receipt, concurrency-round interval, startup counter,
+and RSS sample; it also binds commands and hashes to the current build/model manifests. The
+sanitized public copy must pass the same semantic replay after its raw hashes are refreshed.
 
 ### FR-7: Bounded auto-tuning
 
@@ -170,6 +180,30 @@ The optimizer shall search in stages rather than running an uncontrolled Cartesi
 5. produce a Pareto frontier and select a balanced feasible profile.
 
 **Acceptance:** candidate count and maximum runtime are configurable; the optimizer can resume from cached raw data.
+
+The staged tuner must consume the verified performance-probe artifact before constructing A3
+service candidates. It ranks the two KleidiAI Q4_0 micro cells by `tg64` throughput, then `pp128`
+throughput and thread count as deterministic tie-breakers, and constrains service search to those
+measured thread counts. Because formal A3 quality requests are sequential, only `parallel=1` is
+eligible for selection; the independent true-concurrency probe matrix supplies the required p1/p2
+evidence without presenting single-request latency as aggregate concurrency throughput.
+
+Resume is valid only when a candidate has both a complete raw case/repetition matrix and a receipt
+that cites exactly those run IDs. A complete plan is returned without inference only after strict
+raw replay. Partial or unreceipted raw rows fail closed instead of repeating a request or claiming
+a cached result. The monotonic `max_minutes` deadline is passed into startup and every inference,
+so one candidate or held-out call cannot silently overrun the search budget. Calibration ranking
+freezes `scheduled_finalists`; a candidate enters `admitted_finalists` only after all held-out
+cases and requested repetitions complete, and every admitted candidate therefore has a complete
+replayable receipt.
+
+Strict verification independently regenerates the probe-ranked candidate set and recomputes the
+calibration ranking, held-out candidate summaries, quality-gate decisions, and selected A3 from
+raw request/response evidence. Editing `search-plan.json` and the optimized profile together is
+not sufficient to change the selected deployment.
+
+Quick mode reduces calibration search depth only. It does not truncate the 20-case formal A0/A1/A2
+ablations, any admitted A3 held-out finalist, or the complete minimum micro/concurrency matrix.
 
 ### FR-8: Quality-gated cascade
 
@@ -209,6 +243,10 @@ The report generator shall produce offline-viewable HTML, Markdown, JSON, CSV, a
 - routing distribution;
 - memory and concurrency results;
 - limitations and exact reproduction commands.
+
+For the supporting probes, the report must disclose the exact generic/KleidiAI build variants and
+source commit, CPU-only configuration, KleidiAI runtime marker, model filenames/bytes/checksums and
+tensor inventories, formal versus probe sample counts and failures, and p1/p2 idle/peak RSS.
 
 **Acceptance:** every headline value is programmatically traced to raw data; unresolved placeholders fail the build.
 

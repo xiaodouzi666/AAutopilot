@@ -60,10 +60,58 @@ def test_only_reviewed_runtime_paths_enable_elapsed_prefix_handling(tmp_path: Pa
     raw_proof.parent.mkdir(parents=True)
     unrelated = tmp_path / "other" / "server.stderr.log"
     unrelated.parent.mkdir()
+    probe_service = (
+        tmp_path
+        / "performance-probes-raw"
+        / ("a" * 32)
+        / "service"
+        / "kleidiai-p2"
+        / "server.stderr.log"
+    )
+    probe_service.parent.mkdir(parents=True)
+    probe_combined = probe_service.parent.parent / "kleidiai-p2-combined.log"
+    probe_micro = (
+        tmp_path / "performance-probes-raw" / ("a" * 32) / "micro" / "kleidiai-q4_0-t4.stderr.txt"
+    )
 
     assert REDACTOR["is_llama_runtime_evidence"](runtime_log)
     assert REDACTOR["is_llama_runtime_evidence"](raw_proof)
+    assert REDACTOR["is_llama_runtime_evidence"](probe_service)
+    assert REDACTOR["is_llama_runtime_evidence"](probe_combined)
+    assert REDACTOR["is_llama_runtime_evidence"](probe_micro)
     assert not REDACTOR["is_llama_runtime_evidence"](unrelated)
+
+
+def test_probe_service_check_and_public_copy_handle_elapsed_prefixes(tmp_path: Path) -> None:
+    source = tmp_path / "artifacts"
+    session = "b" * 32
+    service = source / "performance-probes-raw" / session / "service"
+    stderr_log = service / "generic-p1" / "server.stderr.log"
+    combined_log = service / "generic-p1-combined.log"
+    micro_log = (
+        source / "performance-probes-raw" / session / "micro" / "kleidiai-q4_0-t4.stderr.txt"
+    )
+    stderr_log.parent.mkdir(parents=True)
+    micro_log.parent.mkdir(parents=True)
+    stderr_log.write_text(LLAMA_LOG, encoding="utf-8")
+    combined_log.write_text(LLAMA_LOG, encoding="utf-8")
+    micro_log.write_text(LLAMA_LOG, encoding="utf-8")
+
+    findings, scanned = REDACTOR["process_in_place"]([source], write=False)
+
+    assert scanned == 3
+    assert findings == []
+
+    destination = tmp_path / "artifacts-public"
+    REDACTOR["sanitized_copy"](source, destination)
+    for source_log in (stderr_log, combined_log, micro_log):
+        public_log = destination / source_log.relative_to(source)
+        public_text = public_log.read_text(encoding="utf-8")
+        assert public_text.count("<llama-elapsed>") == 4
+        assert "0.10.168.200" not in public_text
+    public_findings, public_scanned = REDACTOR["process_in_place"]([destination], write=False)
+    assert public_scanned == 3
+    assert public_findings == []
 
 
 def test_artifact_check_uses_runtime_path_scope(tmp_path: Path) -> None:
@@ -173,4 +221,32 @@ def test_sanitized_copy_rehashes_nested_a4_component_store(tmp_path: Path) -> No
     assert (
         manifest["sha256"]["runtime-proof.txt"]
         == hashlib.sha256(public_proof.read_bytes()).hexdigest()
+    )
+
+
+def test_sanitized_copy_rehashes_performance_probe_raw_manifest(tmp_path: Path) -> None:
+    source = tmp_path / "artifacts"
+    raw = source / "performance-probes-raw" / ("a" * 32)
+    raw.mkdir(parents=True)
+    log = raw / "service.log"
+    log.write_text("peer=10.42.0.7\n", encoding="utf-8")
+    relative = log.relative_to(source).as_posix()
+    (source / "performance-probes.json").write_text(
+        json.dumps(
+            {
+                "raw_root": raw.relative_to(source).as_posix(),
+                "raw_files": {relative: hashlib.sha256(log.read_bytes()).hexdigest()},
+            }
+        ),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "artifacts-public"
+
+    REDACTOR["sanitized_copy"](source, destination)
+
+    public_log = destination / relative
+    public_probe = json.loads((destination / "performance-probes.json").read_text(encoding="utf-8"))
+    assert public_log.read_text(encoding="utf-8") == "peer=<redacted-ip>\n"
+    assert (
+        public_probe["raw_files"][relative] == hashlib.sha256(public_log.read_bytes()).hexdigest()
     )

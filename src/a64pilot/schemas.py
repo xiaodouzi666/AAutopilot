@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SCHEMA_VERSION = "1.0.0"
+SYSTEM_INFO_SCHEMA_VERSION = "2.0.0"
 
 
 class StrictModel(BaseModel):
@@ -19,28 +20,146 @@ class FeatureEvidence(StrictModel):
     evidence: list[str] = []
 
 
+class DistributionInfo(StrictModel):
+    pretty_name: str = Field(min_length=1, max_length=240)
+    identifier: str | None = Field(default=None, max_length=120)
+    version_id: str | None = Field(default=None, max_length=120)
+    source: str = Field(min_length=1, max_length=240)
+
+
+class CacheInfo(StrictModel):
+    name: str = Field(pattern=r"^l[0-9]+(?:[di]|-[a-z]+)?$")
+    level: int = Field(ge=1)
+    kind: str = Field(min_length=1, max_length=40)
+    total_size_bytes: int = Field(gt=0)
+    instances: int = Field(gt=0)
+    shared_cpu_lists: list[list[int]] = []
+    source: str = Field(min_length=1, max_length=240)
+
+
+class ProvenanceLimitation(StrictModel):
+    code: str = Field(pattern=r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
+    field: str = Field(pattern=r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
+    reason: str = Field(min_length=1, max_length=500)
+    sources_checked: list[str] = Field(min_length=1)
+
+
 class SystemInfo(StrictModel):
-    schema_version: str = SCHEMA_VERSION
+    # Target provenance gained mandatory completeness/limitation semantics in v2.
+    # Keep this version independent from the other evidence schemas so an old
+    # system-info payload can never be silently promoted by a default value.
+    schema_version: Literal[SYSTEM_INFO_SCHEMA_VERSION]
     collected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     architecture: str
     architecture_raw: str = "unknown"
     operating_system: str
     kernel: str
     cpu_model: str = "unknown"
+    cpu_identifiers: dict[str, str] = {}
+    distribution: DistributionInfo | None = None
     python_version: str = "unknown"
     arm64: bool = False
     real_benchmark_eligible: bool = False
     logical_cores: int = Field(ge=1)
     physical_cores: int | None = Field(default=None, ge=1)
-    memory_bytes: int | None = Field(default=None, ge=0)
+    memory_bytes: int | None = Field(default=None, gt=0)
     filesystem_free_bytes: int | None = Field(default=None, ge=0)
+    sockets: int | None = Field(default=None, ge=1)
+    numa_nodes: int | None = Field(default=None, ge=1)
+    cache_layout: list[CacheInfo] = []
     tool_versions: dict[str, str | None] = {}
     features: dict[str, FeatureEvidence] = {}
     topology: dict[str, Any] = {}
     affinity_candidates: dict[str, list[int]] = {}
+    provenance_limitations: list[ProvenanceLimitation] = []
+    target_provenance_status: Literal["complete", "limited"] = "complete"
     sources: list[str] = []
     limitations: list[str] = []
     public_redacted: bool = True
+
+    @model_validator(mode="after")
+    def required_target_provenance_is_explicit(self) -> SystemInfo:
+        """A required fact must be measured or carry a structured limitation."""
+
+        unknown_values = {"", "-", "unknown", "n/a", "not available", "none"}
+        unresolved: set[str] = set()
+        if self.cpu_model.strip().lower() in unknown_values:
+            unresolved.add("cpu_model")
+        if self.distribution is None:
+            unresolved.add("distribution")
+        if self.physical_cores is None:
+            unresolved.add("physical_cores")
+        if self.memory_bytes is None:
+            unresolved.add("memory_bytes")
+        compiler = self.tool_versions.get("compiler")
+        if compiler is None or compiler.strip().lower() in unknown_values:
+            unresolved.add("compiler")
+        if self.sockets is None:
+            unresolved.add("sockets")
+        if self.numa_nodes is None:
+            unresolved.add("numa_nodes")
+        if not any(item.evidence for item in self.features.values()):
+            unresolved.add("instruction_features")
+        topology_cores = self.topology.get("cores")
+        if (
+            not isinstance(topology_cores, list)
+            or not topology_cores
+            or any(
+                not isinstance(core, dict)
+                or (core.get("capacity") is None and core.get("max_frequency_khz") is None)
+                for core in topology_cores
+            )
+        ):
+            unresolved.add("heterogeneous_clusters")
+        if not self.affinity_candidates:
+            unresolved.add("affinity_candidates")
+        cache_names = [cache.name for cache in self.cache_layout]
+        if len(cache_names) != len(set(cache_names)):
+            raise ValueError("cache_layout contains duplicate normalized cache names")
+        for name in ("l1d", "l1i", "l2", "l3"):
+            if name not in cache_names:
+                unresolved.add(f"cache_{name}")
+
+        declared = {item.field for item in self.provenance_limitations}
+        undeclared = sorted(unresolved.difference(declared))
+        if undeclared:
+            raise ValueError(
+                "required target provenance is absent without a structured limitation: "
+                + ", ".join(undeclared)
+            )
+        flat_limitations = "\n".join(self.limitations)
+        missing_flat = sorted(
+            item.code
+            for item in self.provenance_limitations
+            if f"{item.code}:" not in flat_limitations
+        )
+        if missing_flat:
+            raise ValueError(
+                "structured provenance limitations are absent from limitations: "
+                + ", ".join(missing_flat)
+            )
+
+        expected_status = "limited" if self.provenance_limitations else "complete"
+        if self.target_provenance_status != expected_status:
+            raise ValueError(
+                "target_provenance_status disagrees with structured provenance limitations"
+            )
+
+        topology_physical = self.topology.get("physical_cores")
+        if topology_physical is not None and topology_physical != self.physical_cores:
+            raise ValueError("topology physical core count disagrees with physical_cores")
+        topology_sockets = self.topology.get("sockets")
+        if topology_sockets is not None and topology_sockets != self.sockets:
+            raise ValueError("topology socket count disagrees with top-level sockets")
+        topology_numa = self.topology.get("numa_nodes")
+        if topology_numa is not None and topology_numa != self.numa_nodes:
+            raise ValueError("topology NUMA count disagrees with top-level numa_nodes")
+        topology_caches = self.topology.get("cache_layout")
+        if topology_caches is not None and topology_caches != [
+            cache.model_dump(mode="json") for cache in self.cache_layout
+        ]:
+            raise ValueError("topology cache layout disagrees with top-level cache_layout")
+        return self
 
 
 class BuildVariant(StrictModel):

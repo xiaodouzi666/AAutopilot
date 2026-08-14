@@ -40,7 +40,7 @@ from a64pilot.models.gguf import ModelInventoryProof, verify_model_inventory
 from a64pilot.models.registry import default_registry
 from a64pilot.provenance import write_json
 from a64pilot.runtime.llama_command import LlamaServerConfig, inspect_llama_server_capabilities
-from a64pilot.runtime.openai_client import OpenAIClient
+from a64pilot.runtime.openai_client import ClientCompletion, OpenAIClient
 from a64pilot.runtime.process_manager import LlamaServerProcess, find_available_port
 from a64pilot.schemas import BenchmarkRecord, BuildManifest
 from a64pilot.settings import BENCHMARK_MAX_OUTPUT_TOKENS
@@ -52,6 +52,34 @@ class BenchmarkEnvironmentError(RuntimeError):
 
 REAL_BENCHMARK_MAX_TOKENS: Final[int] = BENCHMARK_MAX_OUTPUT_TOKENS
 REAL_BENCHMARK_SEED: Final[int] = 20260813
+
+
+def _remaining_budget_seconds(deadline: float | None) -> float | None:
+    """Return the remaining monotonic budget or fail before starting more work."""
+
+    if deadline is None:
+        return None
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise BenchmarkEnvironmentError("benchmark runtime budget was exhausted")
+    return remaining
+
+
+async def _chat_with_deadline(
+    client: OpenAIClient,
+    *,
+    deadline: float | None,
+    **request: object,
+) -> ClientCompletion:
+    """Bound one inference by the caller's absolute monotonic deadline."""
+
+    remaining = _remaining_budget_seconds(deadline)
+    try:
+        if remaining is None:
+            return await client.chat_completion(**request)
+        return await asyncio.wait_for(client.chat_completion(**request), timeout=remaining)
+    except TimeoutError as exc:
+        raise BenchmarkEnvironmentError("benchmark inference exceeded runtime budget") from exc
 
 
 def _wait_for_kleidiai_load_proof(
@@ -195,9 +223,14 @@ class RealServiceBenchmark:
         repetitions: int = 1,
         limit: int | None = None,
         warmups: int = 1,
+        deadline: float | None = None,
     ) -> list[BenchmarkRecord]:
         _validate_environment(candidate)
-        capabilities = inspect_llama_server_capabilities(candidate.binary)
+        remaining = _remaining_budget_seconds(deadline)
+        capabilities = inspect_llama_server_capabilities(
+            candidate.binary,
+            timeout_s=30.0 if remaining is None else min(30.0, remaining),
+        )
         port = find_available_port(18080 if candidate.backend == "generic" else 18180)
         config = LlamaServerConfig(
             binary=candidate.binary,
@@ -214,16 +247,21 @@ class RealServiceBenchmark:
             cpu_only=True,
             affinity=candidate.affinity,
         )
-        manager = LlamaServerProcess(
-            config,
-            capabilities=capabilities,
-            log_dir=self.artifacts_dir / "runtime",
-            startup_timeout_s=self.startup_timeout_s,
-        )
         model_hash = sha256_file(candidate.model)
         reviewed_model: ModelInventoryProof | None = None
         if candidate.backend == "kleidiai":
             reviewed_model = _reviewed_model_proof(candidate, model_hash)
+        remaining = _remaining_budget_seconds(deadline)
+        manager = LlamaServerProcess(
+            config,
+            capabilities=capabilities,
+            log_dir=self.artifacts_dir / "runtime",
+            startup_timeout_s=(
+                self.startup_timeout_s
+                if remaining is None
+                else min(self.startup_timeout_s, remaining)
+            ),
+        )
         cases = self.selected_cases(split, limit)
         if not cases:
             raise ValueError(f"no cases selected for split {split}")
@@ -233,6 +271,7 @@ class RealServiceBenchmark:
         response_format = triage_openai_response_format()
         try:
             manager.start()
+            _remaining_budget_seconds(deadline)
             expected = (
                 BuildVariant.KLEIDIAI if candidate.backend == "kleidiai" else BuildVariant.GENERIC
             )
@@ -242,6 +281,7 @@ class RealServiceBenchmark:
                     manager,
                     quantization=candidate.quantization,
                     reviewed_model=reviewed_model,
+                    timeout_s=min(5.0, _remaining_budget_seconds(deadline) or 5.0),
                 )
             else:
                 log_text = manager.log_text()
@@ -257,9 +297,15 @@ class RealServiceBenchmark:
                 raise BenchmarkEnvironmentError("; ".join(backend_proof.errors))
             if not cpu_proof.verified:
                 raise BenchmarkEnvironmentError("; ".join(cpu_proof.errors))
-            async with OpenAIClient(f"http://127.0.0.1:{port}", timeout_s=240.0) as client:
+            request_timeout = _remaining_budget_seconds(deadline)
+            async with OpenAIClient(
+                f"http://127.0.0.1:{port}",
+                timeout_s=240.0 if request_timeout is None else min(240.0, request_timeout),
+            ) as client:
                 for case in cases[:warmups]:
-                    await client.chat_completion(
+                    await _chat_with_deadline(
+                        client,
+                        deadline=deadline,
                         messages=build_messages(case.incident),
                         model=candidate.candidate_id,
                         temperature=0.0,
@@ -267,6 +313,7 @@ class RealServiceBenchmark:
                         max_tokens=self.max_tokens,
                         seed=self.seed,
                         stream=True,
+                        stream_include_usage=True,
                         response_format=response_format,
                     )
                     if candidate.backend == "kleidiai" and not runtime_marker_recorded:
@@ -292,7 +339,9 @@ class RealServiceBenchmark:
                 for repetition in range(repetitions):
                     for case in cases:
                         messages = build_messages(case.incident)
-                        completion = await client.chat_completion(
+                        completion = await _chat_with_deadline(
+                            client,
+                            deadline=deadline,
                             messages=messages,
                             model=candidate.candidate_id,
                             temperature=0.0,
@@ -300,6 +349,7 @@ class RealServiceBenchmark:
                             max_tokens=self.max_tokens,
                             seed=self.seed,
                             stream=True,
+                            stream_include_usage=True,
                             response_format=response_format,
                         )
                         score = score_case(case, completion.text)
@@ -307,6 +357,18 @@ class RealServiceBenchmark:
                         timing = completion.timing
                         completion_tokens = completion.completion_tokens or 0
                         generation_rate = completion.generation_tokens_per_second
+                        prompt_tokens = int(completion.usage.get("prompt_tokens", 0))
+                        if (
+                            timing.first_content_token_ns is None
+                            or prompt_tokens <= 0
+                            or completion_tokens <= 0
+                            or generation_rate is None
+                            or generation_rate <= 0
+                        ):
+                            raise BenchmarkEnvironmentError(
+                                "streaming benchmark response lacks replayable first-token or "
+                                "positive token-usage evidence"
+                            )
                         run_id = uuid4().hex
                         run_log_text = manager.log_text()
                         run_backend_proof = verify_backend_log(
@@ -356,7 +418,7 @@ class RealServiceBenchmark:
                             end_ns=timing.end_ns,
                             ttft_ms=timing.ttft_ms,
                             e2e_ms=timing.e2e_ms,
-                            prompt_tokens=int(completion.usage.get("prompt_tokens", 0)),
+                            prompt_tokens=prompt_tokens,
                             completion_tokens=completion_tokens,
                             generation_tok_s=generation_rate,
                             peak_rss_mb=manager.peak_rss_bytes / (1024 * 1024),
@@ -401,6 +463,7 @@ class RealServiceBenchmark:
                                 "max_tokens": self.max_tokens,
                                 "seed": self.seed,
                                 "stream": True,
+                                "stream_options": {"include_usage": True},
                                 "response_format": response_format,
                             },
                         )

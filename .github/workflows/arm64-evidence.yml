@@ -35,7 +35,9 @@ jobs:
     # Arm64 Linux label for public repositories:
     # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 150
+    # The supporting protocol matrix has its own 20-minute hard budget.  Keep a
+    # separate outer margin for setup, formal A0-A4 rows, rendering, and upload.
+    timeout-minutes: 240
     env:
       A64PILOT_CI: "1"
       BENCHMARK_REPETITIONS: ${{ inputs.repetitions || '1' }}
@@ -74,15 +76,95 @@ jobs:
       - name: Sync locked Python environment
         run: uv sync --frozen --extra dev --no-editable --reinstall-package aarch64-autopilot
 
-      - name: Record target provenance
-        run: make doctor
-
       - name: Run source, schema, quality-data, and fixture gates
         env:
           # The committed screenshot set belongs to the prior published run and is verified
           # before this job replaces working-tree evidence with a new measurement session.
           A64PILOT_VERIFY_COMMITTED_ASSETS: "1"
         run: make verify-source
+
+      - name: Start a clean target-evidence session
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The committed prior-run assets were checked above. Remove only explicit
+          # run-scoped outputs before any current-run capture can observe stale evidence.
+          # This step is unconditional so an early source-gate failure cannot upload the
+          # checkout's prior report under the new run ID. Keep deterministic source fixtures.
+          rm -rf artifacts-public
+          rm -rf \
+            artifacts/raw \
+            artifacts/performance-probes-raw \
+            artifacts/a4 \
+            artifacts/figures \
+            artifacts/runtime \
+            artifacts/screenshots \
+            artifacts/submission \
+            artifacts/tmp
+          rm -f \
+            artifacts/performance-probes.json \
+            artifacts/system-info.json \
+            artifacts/system-info.md \
+            artifacts/build-manifest.json \
+            artifacts/build-toolchain.json \
+            artifacts/cmake-generic-cache.txt \
+            artifacts/cmake-generic-flags.txt \
+            artifacts/cmake-kleidiai-cache.txt \
+            artifacts/cmake-kleidiai-flags.txt \
+            artifacts/model-manifest.json \
+            artifacts/search-plan.json \
+            artifacts/a4-frozen-policy.json \
+            artifacts/cascade-status.json \
+            artifacts/quality-results.json \
+            artifacts/quality-summary.json \
+            artifacts/optimized-profile.yaml \
+            artifacts/benchmark-results.csv \
+            artifacts/benchmark-results.json \
+            artifacts/ablation-results.csv \
+            artifacts/claims.json \
+            artifacts/report-data.json \
+            artifacts/report-integrity.json \
+            artifacts/report.html \
+            artifacts/report.md \
+            artifacts/evidence-index.json \
+            artifacts/devpost-writeup-final.md \
+            artifacts/submission-checklist.md \
+            artifacts/video-script-final.md
+          find artifacts -maxdepth 1 -type f -name 'quality-a*.json' -delete
+          find artifacts -maxdepth 1 -type f -name 'quality-kleidiai-*.json' -delete
+
+      - name: Record target provenance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          make doctor
+          uv run --frozen --no-editable python - <<'PY'
+          from pathlib import Path
+          from a64pilot.schemas import SystemInfo
+
+          info = SystemInfo.model_validate_json(
+              Path("artifacts/system-info.json").read_text(encoding="utf-8")
+          )
+          assert info.schema_version == "2.0.0"
+          assert info.architecture == "aarch64"
+          assert info.operating_system.lower() == "linux"
+          assert info.real_benchmark_eligible
+          print(
+              "target provenance:",
+              info.cpu_model,
+              info.distribution.pretty_name if info.distribution else "distribution-not-exposed",
+              f"physical_cores={info.physical_cores}",
+              f"memory_bytes={info.memory_bytes}",
+              f"compiler={info.tool_versions.get('compiler')}",
+              f"sockets={info.sockets}",
+              f"numa_nodes={info.numa_nodes}",
+              "caches=" + ",".join(cache.name for cache in info.cache_layout),
+              "limitations="
+              + ",".join(item.code for item in info.provenance_limitations),
+              f"status={info.target_provenance_status}",
+          )
+          PY
 
       - name: Build same-commit generic and KleidiAI CPU backends
         run: make build JOBS=4
@@ -98,7 +180,12 @@ jobs:
         # mixed into the complete 20-case held-out A1/A2 claim below.
         run: make smoke
 
+      - name: Run bounded micro, startup, token, and p1/p2 probes
+        timeout-minutes: 25
+        run: make probes PROBE_FLAGS="--repetitions 3 --max-minutes 20"
+
       - name: Run the bounded real benchmark
+        timeout-minutes: 85
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -108,6 +195,7 @@ jobs:
           esac
           uv run --frozen --no-editable a64pilot benchmark all \
             --quick \
+            --formal-max-minutes 35 \
             --repetitions "$BENCHMARK_REPETITIONS"
 
       - name: Select only quality-feasible measured rows
@@ -117,7 +205,11 @@ jobs:
         # A measured gate rejection is an honest result and exits zero with A3 as
         # the shipping fallback. Missing models/evidence, an invalid freeze, or an
         # incomplete 40/20 run exits nonzero and stops the evidence pipeline.
-        run: make a4
+        timeout-minutes: 65
+        run: >-
+          make a4
+          A4_CALIBRATION_FLAGS="--max-minutes 30"
+          A4_HELD_OUT_FLAGS="--max-minutes 30"
 
       - name: Render the strict report and Devpost materials
         run: |
@@ -171,6 +263,26 @@ jobs:
         if: always()
         run: uv run --frozen --no-editable python scripts/redact-artifacts.py --check artifacts-public
 
+      - name: Verify sanitized A0-A4 evidence derivation
+        if: success()
+        run: >-
+          uv run --frozen --no-editable a64pilot verify-public-derivation
+          --artifacts-dir artifacts-public
+          --private-artifacts artifacts
+
+      - name: Replay sanitized probe semantics
+        if: success()
+        run: >-
+          uv run --frozen --no-editable a64pilot verify-probes
+          --artifacts-dir artifacts-public
+          --manifest-only
+
+      - name: Verify sanitized report integrity
+        if: success()
+        run: >-
+          uv run --frozen --no-editable a64pilot verify-report-integrity
+          --artifacts-dir artifacts-public
+
       - name: Package the verified public evidence
         if: success()
         shell: bash
@@ -187,7 +299,7 @@ jobs:
           subject-path: aarch64-autopilot-evidence.tar.gz
 
       - name: Add report to the workflow summary
-        if: always()
+        if: success()
         shell: bash
         run: |
           if [[ -f artifacts-public/report.md ]]; then
@@ -197,7 +309,8 @@ jobs:
           fi
 
       - name: Upload sanitized evidence without writing back to Git
-        if: always()
+        # Never upload a partial destination or content that failed the redaction check.
+        if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: aarch64-autopilot-arm64-${{ github.run_id }}

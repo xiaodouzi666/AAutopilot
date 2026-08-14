@@ -34,12 +34,16 @@ claimed complete.
   `artifacts/devpost-writeup-final.md`.
 - [x] Four evidence screenshots, their captions, timecodes, source hashes, and frame hashes are in
   `artifacts/screenshots/manifest.json`.
-- [x] The public [demo video](https://youtu.be/RT0ORZ3iIpE) is under three minutes, contains no
+{% if video_url %}- [x] The public [demo video]({{ video_url }}) is under three minutes, contains no
   music, and uses only measured values. Its unchanged visual stream derives from the attested CI
   video; the natural narration derivative is disclosed in `artifacts/evidence-index.json`.
+{% else %}- [ ] The optional public demo URL is recorded only after the current measured video is uploaded.
+{% endif %}
 - [x] The {% if evidence_release.get("url") %}[evidence release]({{ evidence_release.get("url") }}){% else %}[evidence releases]({{ repo_url }}/releases){% endif %} and
   [workflow run]({{ evidence_run.get("run_url") }}) are linked from the Devpost draft.
-- [ ] Formal Devpost submission receipt and submitted timestamp are not recorded yet.
+{% if devpost.get("submitted_at") %}- [x] Devpost submission is live and was read back with submitted timestamp `{{ devpost.get("submitted_at") }}`.
+{% else %}- [ ] Formal Devpost submission receipt and submitted timestamp are not recorded yet.
+{% endif %}
 
 ## Reproducible final checks
 
@@ -49,12 +53,12 @@ uv run --frozen --no-editable python scripts/check-final-placeholders.py
 ```
 
 Evidence status: **{{ "measured" if measured else "measurement pending — not ready for final submit" }}**.
-Formal Devpost status: **not submitted until a receipt and timestamp are recorded**.
+Formal Devpost status: **{% if devpost.get("submitted_at") %}submitted and verified live{% else %}not submitted until a receipt and timestamp are recorded{% endif %}**.
 
 Measured source commit: `{{ evidence_run.get("head_sha", "recorded by the workflow") }}`
 
 Public repository: {{ repo_url }}
 
-Devpost draft: https://devpost.com/software/aarch64-autopilot-self-optimizing-agentic-ai-on-arm-cpus
+Devpost project: {{ devpost.get("url", "https://devpost.com/software/aarch64-autopilot-self-optimizing-agentic-ai-on-arm-cpus") }}
 
-Public video: https://youtu.be/RT0ORZ3iIpE
+Public video: {{ video_url or "not recorded" }}

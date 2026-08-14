@@ -255,6 +255,23 @@ Use several best-effort sources and record which were available:
 - Linux auxiliary vector via a tiny C helper or Python where practical;
 - `free`, `/proc/meminfo`, and filesystem capacity.
 
+The checked `SystemInfo` schema exposes CPU model, `/etc/os-release` distribution identity,
+visible socket and NUMA counts, and normalized `l1d`, `l1i`, `l2`, and `l3` cache aggregates as
+first-class fields. Linux collection prefers `lscpu --json` for CPU model and count fallbacks,
+sysfs for topology/cache sharing, and `/proc/cpuinfo` for explicit Arm implementer/part IDs and
+feature evidence.
+
+A required target fact is never silently represented by `unknown`, `null`, or an absent cache
+row. This includes CPU model, distro, physical-core count, total memory, compiler version, sockets,
+NUMA, and L1d/L1i/L2/L3 cache. Logical CPU count is never substituted for an unavailable physical
+core count. When the host or hosted runner does not expose a fact, `provenance_limitations`
+contains a stable code, affected field, human-readable reason, and the sources checked; the same
+code is included in the general `limitations` list and rendered in both system/report Markdown
+and HTML. Schema validation rejects any required missing fact without that structured declaration.
+Strict evidence verification recollects and compares CPU model/identifiers, distro, memory,
+compiler, feature evidence, physical/logical cores, full topology, affinity candidates, sockets,
+NUMA, cache layout, and structured limitations on the same Arm64 Linux host.
+
 ### Feature normalization
 
 Normalize features into booleans and evidence strings:
@@ -432,9 +449,10 @@ v1 calibration IDs in their prior order (with
 
 Automated validation must prove 40/20 sizes, 60 unique IDs, exact quotas, exact deterministic
 selection, and zero v2-test overlap with the 24 observed cases. The router may use calibration
-labels but never v2 held-out expected labels. The report must show the split and hash. Only
-the v2 test set may be called the unseen final holdout, narrowly meaning it had not been
-executed or inspected in prior run output; the public dataset is not secret. The immutable
+labels but never v2 held-out expected labels. The report must show the split and hash. V2 was
+unseen only before its first formal execution in published run `31778419786`; subsequent runs
+using the unchanged split are replication/revalidation evidence and must not call it newly unseen.
+The immutable
 `demo/split-freeze-v2.json` audit record preserves both split hashes and every selection input
 and digest. Split selection uses only case ID and category, never private answer/tool/safety
 labels, model outputs, scores, latency, or other run results.
@@ -515,6 +533,9 @@ a64pilot verify
 ```
 
 Commands must be idempotent and resume from valid cached artifacts unless `--force` is provided.
+For formal tuning, "valid" means an exact candidate receipt plus the complete raw
+case/repetition matrix it cites. A completed plan is replayed before a zero-inference return;
+partial or unreceipted inference is never repeated implicitly.
 
 ## 12. OpenAI-compatible proxy
 
@@ -604,7 +625,10 @@ unique({1, ceil(cores/4), ceil(cores/2), physical_or_allowed_cores})
 
 On heterogeneous systems, also test the performance-cluster affinity set.
 
-Use short prompt-processing and generation workloads. Run warmups and at least three measured repetitions. Keep the top two or three configurations per model under memory limits.
+Use short prompt-processing and generation workloads. Run warmups and at least three measured
+repetitions. The A3 search consumes the verified KleidiAI-Q4_0 micro ranking (generation
+throughput first, prompt throughput second) and permits only those measured thread counts to
+advance.
 
 ### Stage C — service configuration
 
@@ -612,10 +636,13 @@ For top candidates, test a small matrix of:
 
 - batch: 128, 256, 512 where valid;
 - micro-batch: 64, 128, 256 and never greater than batch;
-- parallel slots/concurrency: 1, 2, and up to 4 when memory permits;
+- selectable A3 service profile: parallel slots = 1 because formal quality requests are serial;
+- independent true-concurrency probes: parallel slots = 1 and 2 with equal per-slot context;
 - context: fixed to the smallest value sufficient for the demo, initially 2048 or 4096.
 
-Use current binary `--help` output to map these concepts to the pinned flags. Do not assume obsolete option names.
+Use current binary `--help` output to map these concepts to the pinned flags. Do not assume
+obsolete option names. Never select p2/p4 from serial request rows; expanding the selectable
+matrix above p1 requires explicit concurrent rounds and aggregate wall-interval throughput replay.
 
 ### Stage D — quality and routing calibration
 
@@ -631,7 +658,15 @@ Run only:
 - tuned strong-only profile;
 - final cascade profile if feasible.
 
-Use repeated requests and fixed seeds/sampling. Do not tune from held-out results.
+Use repeated requests and fixed seeds/sampling. Do not tune from held-out results. Freeze an
+ordered scheduled-finalist list from calibration. Admission occurs only after one scheduled
+candidate completes the full held-out matrix; a hard monotonic deadline is passed through server
+startup and every request, and timeout fails the search rather than producing a partial admission.
+
+The strict verifier regenerates the micro-constrained candidates, recomputes calibration summaries
+and rank order from raw response rows, then recomputes each held-out summary and quality gate. It
+derives the selected A3 as the first calibration-ranked passing receipt, independently of the
+search-plan and optimized-profile summary fields.
 
 ### Pareto selection
 
@@ -655,8 +690,9 @@ For repeated measurements:
 
 - report median, p50, p95, mean, standard deviation, and coefficient of variation;
 - compute paired speedup where candidate and baseline share the same case/repetition;
-- prospectively preregister mean TTFT reduction as the only primary complete-pair A1/A2
-  metric on unseen split v2; preregister p95 E2E latency reduction and median per-request
+- preserve mean TTFT reduction as the only primary complete-pair A1/A2 metric prospectively
+  preregistered before split v2's first run; for unchanged-split replications, disclose that v2
+  was previously executed; retain p95 E2E latency reduction and median per-request
   throughput increase (`1000 / E2E_ms` per row) as transparent secondary outputs;
 - calculate all three on the same complete 20-case paired rows, with a paired 95% bootstrap
   interval using 5,000 resamples, seed `20260813`, and the mean, p95, and median reducer

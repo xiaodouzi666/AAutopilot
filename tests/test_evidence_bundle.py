@@ -161,7 +161,26 @@ def _write_model_fixture(project: Path) -> None:
 
 
 def _system_info() -> SystemInfo:
+    cache_layout = [
+        {
+            "name": name,
+            "level": level,
+            "kind": kind,
+            "total_size_bytes": size,
+            "instances": instances,
+            "shared_cpu_lists": [],
+            "source": "fixture",
+        }
+        for name, level, kind, size, instances in (
+            ("l1d", 1, "data", 256 * 1024, 4),
+            ("l1i", 1, "instruction", 256 * 1024, 4),
+            ("l2", 2, "unified", 4 * 1024**2, 4),
+            ("l3", 3, "unified", 32 * 1024**2, 1),
+        )
+    ]
+    affinity = {"all_allowed": [0, 1, 2, 3]}
     return SystemInfo(
+        schema_version="2.0.0",
         architecture="aarch64",
         architecture_raw="aarch64",
         operating_system="Linux",
@@ -172,6 +191,46 @@ def _system_info() -> SystemInfo:
         real_benchmark_eligible=True,
         logical_cores=4,
         physical_cores=4,
+        sockets=1,
+        numa_nodes=1,
+        distribution={
+            "pretty_name": "Fixture Linux 1",
+            "identifier": "fixture",
+            "version_id": "1",
+            "source": "/etc/os-release",
+        },
+        cache_layout=cache_layout,
+        tool_versions={"compiler": "fixture-cc 1.0", "python": "3.12.0"},
+        features={"dotprod": {"supported": True, "evidence": ["fixture: asimddp"]}},
+        topology={
+            "logical_cpus": 4,
+            "physical_cores": 4,
+            "allowed_cpus": [0, 1, 2, 3],
+            "cores": [
+                {
+                    "cpu_id": cpu,
+                    "core_id": cpu,
+                    "package_id": 0,
+                    "max_frequency_khz": None,
+                    "capacity": 1024,
+                    "numa_node": 0,
+                }
+                for cpu in range(4)
+            ],
+            "affinity_candidates": [
+                {
+                    "name": "all_allowed",
+                    "cpus": [0, 1, 2, 3],
+                    "evidence": ["fixture"],
+                }
+            ],
+            "sockets": 1,
+            "numa_nodes": 1,
+            "cache_layout": cache_layout,
+            "sources": ["fixture"],
+            "limitations": [],
+        },
+        affinity_candidates=affinity,
         memory_bytes=16 * 1024**3,
         filesystem_free_bytes=8 * 1024**3,
         public_redacted=True,
@@ -279,7 +338,7 @@ def _write_record(
         e2e_ms=e2e_ms,
         prompt_tokens=64,
         completion_tokens=32,
-        generation_tok_s=20.0,
+        generation_tok_s=32 / ((end_ns - first_token_ns) / 1_000_000_000),
         peak_rss_mb=256.0,
         route="strong",
         schema_valid=score.schema_valid,
@@ -334,6 +393,7 @@ def _write_record(
             "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
             "seed": 20260813,
             "stream": True,
+            "stream_options": {"include_usage": True},
             "response_format": triage_openai_response_format(),
         },
     )
@@ -514,6 +574,109 @@ def test_x86_system_manifest_is_rejected(valid_bundle: EvidenceBundle) -> None:
     _, errors = validate_evidence_bundle(valid_bundle.artifacts)
 
     assert "system manifest is not an Arm64 Linux target" in errors
+
+
+@pytest.mark.parametrize(
+    ("schema_version", "expected_error"),
+    [
+        pytest.param(
+            None,
+            "system manifest schema version is missing; expected 2.0.0",
+            id="missing",
+        ),
+        pytest.param(
+            "1.0.0",
+            "system manifest schema version is unsupported; expected 2.0.0",
+            id="v1",
+        ),
+        pytest.param(
+            "3.0.0",
+            "system manifest schema version is unsupported; expected 2.0.0",
+            id="future",
+        ),
+    ],
+)
+def test_verifier_rejects_non_v2_system_manifest_without_migration(
+    valid_bundle: EvidenceBundle,
+    schema_version: str | None,
+    expected_error: str,
+) -> None:
+    path = valid_bundle.artifacts / "system-info.json"
+    payload = _load_json(path)
+    if schema_version is None:
+        payload.pop("schema_version")
+    else:
+        payload["schema_version"] = schema_version
+    write_json(path, payload)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert expected_error in errors
+    assert not any("system manifest is not an Arm64 Linux target" in row for row in errors)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "cpu_model",
+        "distribution",
+        "physical_cores",
+        "memory_bytes",
+        "compiler",
+        "features",
+        "topology",
+        "affinity_candidates",
+        "sockets",
+        "numa_nodes",
+        "cache_layout",
+    ],
+)
+def test_target_provenance_tampering_disagrees_with_current_host(
+    valid_bundle: EvidenceBundle, field_name: str
+) -> None:
+    path = valid_bundle.artifacts / "system-info.json"
+    payload = _load_json(path)
+    if field_name == "cpu_model":
+        payload[field_name] = "different Arm CPU"
+    elif field_name == "distribution":
+        payload[field_name] = {
+            "pretty_name": "Different Linux",
+            "identifier": "different",
+            "version_id": "2",
+            "source": "/etc/os-release",
+        }
+    elif field_name == "physical_cores":
+        payload[field_name] = 2
+        assert isinstance(payload["topology"], dict)
+        payload["topology"][field_name] = 2
+    elif field_name == "memory_bytes":
+        payload[field_name] = int(payload[field_name]) + 4096
+    elif field_name == "compiler":
+        assert isinstance(payload["tool_versions"], dict)
+        payload["tool_versions"]["compiler"] = "different-cc 2.0"
+    elif field_name == "features":
+        assert isinstance(payload[field_name], dict)
+        payload[field_name]["sve"] = {"supported": True, "evidence": ["tampered"]}
+    elif field_name == "topology":
+        assert isinstance(payload[field_name], dict)
+        payload[field_name]["allowed_cpus"] = [0, 1]
+    elif field_name == "affinity_candidates":
+        payload[field_name] = {"all_allowed": [0, 1]}
+    elif field_name in {"sockets", "numa_nodes"}:
+        payload[field_name] = 2
+        assert isinstance(payload["topology"], dict)
+        payload["topology"][field_name] = 2
+    else:
+        cache_layout = payload[field_name]
+        assert isinstance(cache_layout, list) and isinstance(cache_layout[0], dict)
+        cache_layout[0]["total_size_bytes"] = int(cache_layout[0]["total_size_bytes"]) + 1
+        assert isinstance(payload["topology"], dict)
+        payload["topology"][field_name] = cache_layout
+    write_json(path, payload)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert f"system manifest disagrees with current host: {field_name}" in errors
 
 
 def test_model_registry_mismatch_is_rejected(valid_bundle: EvidenceBundle) -> None:

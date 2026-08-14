@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -194,6 +196,10 @@ def benchmark_quality(
     results: Annotated[
         Path, typer.Option(help="Combined calibration and held-out quality artifact.")
     ] = Path("artifacts/quality-results.json"),
+    max_minutes: Annotated[
+        float,
+        typer.Option(help="Hard wall-clock budget for this calibration or held-out phase."),
+    ] = 30.0,
 ) -> None:
     """Validate data, calibrate A4 on 40 cases, or replay it on 20 held-out cases."""
 
@@ -211,6 +217,8 @@ def benchmark_quality(
         raise typer.BadParameter("held-out evaluation requires both --held-out and --frozen")
     if frozen and not held_out:
         raise typer.BadParameter("--frozen is only valid with --held-out")
+    if (calibrate or held_out) and (not math.isfinite(max_minutes) or max_minutes <= 0):
+        raise typer.BadParameter("--max-minutes must be finite and positive")
 
     cases_path = Path("demo/cases.jsonl")
     split_path = Path("demo/split.json")
@@ -247,6 +255,7 @@ def benchmark_quality(
     )
 
     try:
+        deadline = time.monotonic() + max_minutes * 60.0
         if calibrate:
             from a64pilot.benchmark.quality import QualityGateConfig as CascadeQualityGateConfig
             from a64pilot.runtime.deployment import load_measured_profile
@@ -276,7 +285,10 @@ def benchmark_quality(
                 split="calibration",
                 phase="calibration",
                 include_weak=True,
+                deadline=deadline,
             )
+            if time.monotonic() > deadline:
+                raise CascadeWorkflowError("A4 calibration exceeded its runtime budget")
             configured_gate = load_settings().quality_gate
             payload = freeze_calibration(
                 runtime,
@@ -284,6 +296,10 @@ def benchmark_quality(
                 policy_path=policy,
                 gate_config=CascadeQualityGateConfig(**configured_gate.model_dump()),
             )
+            if time.monotonic() > deadline:
+                raise CascadeWorkflowError(
+                    "A4 calibration finalization exceeded its runtime budget"
+                )
             _print_json(
                 {
                     "mode": "calibration",
@@ -329,8 +345,13 @@ def benchmark_quality(
             split="test",
             phase="held-out",
             include_weak=not routing_policy.fallback_strong_only,
+            deadline=deadline,
         )
+        if time.monotonic() > deadline:
+            raise CascadeWorkflowError("A4 held-out replay exceeded its runtime budget")
         payload = evaluate_held_out(evidence, policy_path=policy, results_path=results)
+        if time.monotonic() > deadline:
+            raise CascadeWorkflowError("A4 held-out finalization exceeded its runtime budget")
         _print_json(
             {
                 "mode": "held-out-frozen",
@@ -344,7 +365,7 @@ def benchmark_quality(
                 "results_path": str(results),
             }
         )
-    except (CascadeWorkflowError, ValueError, OSError) as exc:
+    except (RuntimeError, ValueError, OSError) as exc:
         typer.echo(f"A4 quality workflow failed: {exc}", err=True)
         raise typer.Exit(2) from exc
 
@@ -369,11 +390,67 @@ def _fair_run_split(limit: int | None) -> str:
 
 
 def _all_run_limit(stage: str, *, quick: bool) -> int | None:
-    """Never truncate the mandatory complete held-out A1/A2 comparison."""
+    """Never truncate the formal A0/A1/A2 held-out ablations."""
 
-    if stage.lower() in {"a1", "a2"}:
+    if stage.lower() in {"a0", "a1", "a2"}:
         return None
     return 10 if quick else None
+
+
+@benchmark_app.command("probes")
+def benchmark_probes(
+    generic_server: Annotated[Path, typer.Option()] = Path("build/llama-generic/bin/llama-server"),
+    generic_bench: Annotated[Path, typer.Option()] = Path("build/llama-generic/bin/llama-bench"),
+    kleidiai_server: Annotated[Path, typer.Option()] = Path(
+        "build/llama-kleidiai/bin/llama-server"
+    ),
+    kleidiai_bench: Annotated[Path, typer.Option()] = Path("build/llama-kleidiai/bin/llama-bench"),
+    strong_q4: Annotated[Path | None, typer.Option(help="Reviewed strong Q4_0 GGUF.")] = None,
+    strong_q8: Annotated[Path | None, typer.Option(help="Reviewed strong Q8_0 GGUF.")] = None,
+    threads: Annotated[int | None, typer.Option(min=2)] = None,
+    repetitions: Annotated[
+        int,
+        typer.Option(min=3, max=10, help="Measured micro repetitions and service rounds."),
+    ] = 3,
+    max_minutes: Annotated[
+        float,
+        typer.Option(min=1, max=60, help="Hard end-to-end probe runtime budget."),
+    ] = 20.0,
+) -> None:
+    """Run supporting micro, startup, token-rate, and p1/p2 concurrency probes."""
+
+    from a64pilot.benchmark.probes import (
+        PerformanceProbeError,
+        run_performance_probes_sync,
+        summarize_performance_probes,
+    )
+
+    try:
+        evidence = run_performance_probes_sync(
+            generic_server=generic_server,
+            generic_bench=generic_bench,
+            kleidiai_server=kleidiai_server,
+            kleidiai_bench=kleidiai_bench,
+            strong_q4=strong_q4 or _model_path("strong-q4-0"),
+            strong_q8=strong_q8 or _model_path("strong-q8-0"),
+            threads=threads or _default_threads(),
+            repetitions=repetitions,
+            max_minutes=max_minutes,
+        )
+    except (PerformanceProbeError, OSError, ValueError) as exc:
+        typer.echo(f"Performance probes failed closed: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    summary = summarize_performance_probes(evidence)
+    _print_json(
+        {
+            "artifact": "artifacts/performance-probes.json",
+            "status": summary["status"],
+            "micro_cells": len(evidence.micro_runs),
+            "service_cells": len(evidence.service_runs),
+            "repetitions": evidence.repetitions,
+            "elapsed_seconds": evidence.elapsed_seconds,
+        }
+    )
 
 
 @benchmark_app.command("fair")
@@ -502,6 +579,10 @@ def benchmark_all(
             )
         ),
     ] = False,
+    formal_max_minutes: Annotated[
+        float,
+        typer.Option(help="Hard wall-clock budget for the complete A0–A2 formal phase."),
+    ] = 35.0,
 ) -> None:
     """Run A0–A3 where inputs exist, prioritizing the mandatory fair A1/A2 pair."""
 
@@ -510,6 +591,9 @@ def benchmark_all(
     from a64pilot.optimize.tune import TuneSearchError, run_bounded_tune
     from a64pilot.report.render import render_report
     from a64pilot.settings import load_settings
+
+    if not math.isfinite(formal_max_minutes) or formal_max_minutes <= 0:
+        raise typer.BadParameter("--formal-max-minutes must be finite and positive")
 
     generic = Path("build/llama-generic/bin/llama-server")
     kleidiai = Path("build/llama-kleidiai/bin/llama-server")
@@ -558,16 +642,31 @@ def benchmark_all(
             ),
         ]
     )
+    formal_deadline = time.monotonic() + formal_max_minutes * 60.0
     for candidate in candidates:
         typer.echo(f"Running {candidate.candidate_id}…")
-        run_candidate_sync(
-            benchmark,
-            candidate,
-            split="test",
-            repetitions=repetitions,
-            limit=_all_run_limit(candidate.stage, quick=quick),
-            warmups=1,
-        )
+        try:
+            run_candidate_sync(
+                benchmark,
+                candidate,
+                split="test",
+                repetitions=repetitions,
+                limit=_all_run_limit(candidate.stage, quick=quick),
+                warmups=1,
+                deadline=formal_deadline,
+            )
+        except (RuntimeError, ValueError, OSError) as exc:
+            typer.echo(
+                f"Formal benchmark failed closed for {candidate.candidate_id}: {exc}",
+                err=True,
+            )
+            raise typer.Exit(2) from exc
+        if time.monotonic() > formal_deadline:
+            typer.echo(
+                f"Formal benchmark exceeded its runtime budget after {candidate.candidate_id}",
+                err=True,
+            )
+            raise typer.Exit(2)
     try:
         search_plan = run_bounded_tune(
             benchmark=benchmark,
@@ -861,6 +960,51 @@ def verify_backends() -> None:
         raise typer.Exit(2)
 
 
+@app.command("verify-probes")
+def verify_probes(
+    artifacts_dir: Annotated[
+        Path,
+        typer.Option(help="Artifact root containing performance-probes.json and manifests."),
+    ] = Path("artifacts"),
+    manifest_only: Annotated[
+        bool,
+        typer.Option(
+            help=(
+                "Replay schema/raw semantics/manifests without rehashing local binaries/models; "
+                "intended only for an already-sanitized public copy after strict target verify."
+            )
+        ),
+    ] = False,
+) -> None:
+    """Replay the complete supporting micro/startup/p1/p2 evidence artifact."""
+
+    from a64pilot.benchmark.probes import (
+        load_performance_probes,
+        performance_probe_semantic_sha256,
+    )
+
+    try:
+        evidence = load_performance_probes(
+            artifacts_dir / "performance-probes.json",
+            project_root=Path("."),
+            require_current_files=not manifest_only,
+        )
+    except (OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
+    _print_json(
+        {
+            "matrix_complete": evidence.matrix_complete,
+            "fair_pair_verified": evidence.fair_pair_verified,
+            "micro_cells": len(evidence.micro_runs),
+            "service_cells": len(evidence.service_runs),
+            "raw_files": len(evidence.raw_files),
+            "semantic_sha256": performance_probe_semantic_sha256(evidence),
+            "current_binary_model_files_replayed": not manifest_only,
+        }
+    )
+
+
 @app.command("verify-claims")
 def verify_claims() -> None:
     """Validate that every public claim resolves only to measured raw rows."""
@@ -888,6 +1032,61 @@ def verify_claims() -> None:
         )
     _print_json({"claims": len(claims), "errors": errors})
     if not claims or errors:
+        raise typer.Exit(2)
+
+
+@app.command("verify-report-integrity")
+def verify_report_integrity_command(
+    artifacts_dir: Annotated[
+        Path,
+        typer.Option(help="Artifact root containing the rendered report integrity manifest."),
+    ] = Path("artifacts"),
+) -> None:
+    """Verify report hashes and the embedded SystemInfo v2 target manifest."""
+
+    from a64pilot.report.integrity import verify_report_integrity
+
+    errors = verify_report_integrity(artifacts_dir)
+    _print_json({"artifacts_dir": str(artifacts_dir), "errors": errors})
+    if errors:
+        raise typer.Exit(2)
+
+
+@app.command("verify-public-derivation")
+def verify_public_derivation_command(
+    artifacts_dir: Annotated[
+        Path,
+        typer.Option(help="Sanitized public artifact root containing the derivation receipt."),
+    ] = Path("artifacts-public"),
+    private_artifacts: Annotated[
+        Path | None,
+        typer.Option(
+            help=(
+                "Optional private antecedent for CI pair verification; omit for attested "
+                "public-only replay."
+            )
+        ),
+    ] = None,
+) -> None:
+    """Verify every public A0--A4 raw row without rehashing host binaries or models."""
+
+    from a64pilot.report.public_derivation import verify_public_derivation
+
+    errors = verify_public_derivation(
+        artifacts_dir,
+        private_root=private_artifacts,
+        require_complete=True,
+    )
+    _print_json(
+        {
+            "artifacts_dir": str(artifacts_dir),
+            "private_artifacts": (
+                str(private_artifacts) if private_artifacts is not None else None
+            ),
+            "errors": errors,
+        }
+    )
+    if errors:
         raise typer.Exit(2)
 
 
@@ -925,6 +1124,7 @@ def verify(
         SECRET_PATTERN,
         validate_evidence_bundle,
         verify_claim_sources,
+        verify_report_integrity,
         verify_submission_tree,
     )
     from a64pilot.schemas import Claim
@@ -955,10 +1155,20 @@ def verify(
     errors = [f"secret pattern: {path}" for path in secret_hits]
     if not source_only:
         from a64pilot.benchmark.cascade import verify_cascade_evidence
+        from a64pilot.benchmark.probes import load_performance_probes
 
         records, evidence_errors = validate_evidence_bundle("artifacts", require_records=True)
         errors.extend(evidence_errors)
         errors.extend(verify_cascade_evidence("artifacts"))
+        errors.extend(verify_report_integrity("artifacts"))
+        try:
+            load_performance_probes(
+                "artifacts/performance-probes.json",
+                project_root=Path("."),
+                require_current_files=True,
+            )
+        except (OSError, ValueError) as exc:
+            errors.append(str(exc))
         claims_path = Path("artifacts/claims.json")
         if claims_path.is_file():
             try:

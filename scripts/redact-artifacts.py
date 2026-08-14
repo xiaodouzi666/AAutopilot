@@ -103,8 +103,34 @@ def private_literals() -> tuple[tuple[str, str, str], ...]:
 
 
 def is_llama_runtime_evidence(path: Path) -> bool:
-    return (path.name.endswith(".stderr.log") and path.parent.name == "runtime") or (
+    if (path.name.endswith(".stderr.log") and path.parent.name == "runtime") or (
         path.name == "runtime-proof.txt" and path.parent.parent.name == "raw"
+    ):
+        return True
+    parts = path.parts
+    try:
+        probe_index = parts.index("performance-probes-raw")
+    except ValueError:
+        return False
+    relative = parts[probe_index:]
+    if len(relative) < 4 or not re.fullmatch(r"[0-9a-f]{32}", relative[1]):
+        return False
+    if relative[2] == "micro":
+        return bool(
+            len(relative) == 4
+            and re.fullmatch(
+                r"(?:generic|kleidiai)-(?:q8_0|q4_0)-t[1-9]\d*\.stderr\.txt",
+                relative[3],
+            )
+        )
+    if relative[2] != "service":
+        return False
+    if len(relative) == 4:
+        return bool(re.fullmatch(r"(?:generic|kleidiai)-p[12]-combined\.log", relative[3]))
+    return bool(
+        len(relative) == 5
+        and re.fullmatch(r"(?:generic|kleidiai)-p[12]", relative[3])
+        and relative[4].endswith(".stderr.log")
     )
 
 
@@ -238,6 +264,23 @@ def sanitized_copy(source: Path, destination: Path) -> tuple[list[dict[str, obje
         else:
             shutil.copy2(source_path, target)
     _refresh_public_integrity(destination)
+    # A complete benchmark bundle is already replayed against the live host, binaries, and
+    # models before this copy. Bind the sanitized A0--A4 namespaces to that private antecedent
+    # without repeating those expensive checks in the public namespace. Sparse redactor unit
+    # fixtures and early-failure trees deliberately have no receipt; the success-gated workflow
+    # requires a complete receipt before publication.
+    from a64pilot.report.public_derivation import (
+        build_public_derivation_receipt,
+        has_benchmark_derivation_inputs,
+    )
+
+    if has_benchmark_derivation_inputs(source):
+        build_public_derivation_receipt(
+            source,
+            destination,
+            redaction_findings=findings,
+            require_complete=False,
+        )
     return findings, scanned
 
 
@@ -268,7 +311,44 @@ def _refresh_public_integrity(destination: Path) -> None:
                 json.dumps({"sha256": hashes}, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
-    report_files = ("report.html", "report.md", "claims.json", "benchmark-results.json")
+    # Supporting protocol probes use one session-level raw manifest rather than
+    # per-request evidence-store manifests.  Redaction can change native logs,
+    # so bind the public summary to the sanitized bytes before packaging.
+    probe_path = destination / "performance-probes.json"
+    if probe_path.is_file():
+        try:
+            probe = json.loads(probe_path.read_text(encoding="utf-8"))
+            raw_relative = Path(probe["raw_root"])
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise ValueError("invalid performance-probe artifact during rehash") from exc
+        raw_root = (destination / raw_relative).resolve()
+        if (
+            raw_relative.is_absolute()
+            or ".." in raw_relative.parts
+            or not raw_root.is_relative_to(destination.resolve())
+            or not raw_root.is_dir()
+        ):
+            raise ValueError("unsafe or missing performance-probe raw root")
+        probe["raw_files"] = {
+            str(path.relative_to(destination.resolve())): _sha256(path)
+            for path in sorted(raw_root.rglob("*"))
+            if path.is_file()
+        }
+        probe_path.write_text(
+            json.dumps(probe, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    report_files = [
+        "report.html",
+        "report.md",
+        "claims.json",
+        "benchmark-results.json",
+    ]
+    report_files.extend(
+        name
+        for name in ("report-data.json", "performance-probes.json")
+        if (destination / name).is_file()
+    )
     if all((destination / name).is_file() for name in report_files):
         (destination / "report-integrity.json").write_text(
             json.dumps(

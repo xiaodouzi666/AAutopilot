@@ -54,6 +54,9 @@ def render_submission(
     indexed_attestation = (
         evidence_index.get("attestation") if isinstance(evidence_index, dict) else None
     ) or {}
+    indexed_devpost = (
+        evidence_index.get("devpost") if isinstance(evidence_index, dict) else None
+    ) or {}
     github_run_id = os.environ.get("GITHUB_RUN_ID")
     github_sha = os.environ.get("GITHUB_SHA")
     evidence_run = {
@@ -69,6 +72,12 @@ def render_submission(
     # Never carry an older run's release identifiers into a newly executing evidence job.
     release = {} if github_run_id else indexed_release
     attestation = {} if github_run_id else indexed_attestation
+    # External publication is finalized after an evidence job.  A new job must not
+    # silently inherit the previous run's Devpost receipt or public video, while a
+    # local rerender from the finalized repository should reproduce the recorded
+    # public state.
+    devpost = {} if github_run_id else indexed_devpost
+    effective_video_url = video_url or devpost.get("video_url")
     measured = bool(claims) and report.get("evidence_status") == "measured"
     if not allow_pending:
         records, evidence_errors = validate_evidence_bundle(artifacts, require_records=True)
@@ -109,7 +118,8 @@ def render_submission(
         "generated_at": datetime.now(UTC).isoformat(),
         "measured": measured,
         "repo_url": repo_url,
-        "video_url": video_url,
+        "video_url": effective_video_url,
+        "devpost": devpost,
         "claims": claims,
         "primary_claim_id": PRIMARY_CLAIM_ID,
         "system": system,

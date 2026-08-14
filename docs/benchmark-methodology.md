@@ -20,11 +20,11 @@ deviation, coefficient of variation, and fixed-seed paired bootstrap intervals.
 ## Quality
 
 Forty cases are used for routing calibration and twenty are held out. Split v2 was frozen
-before the next final run from cases that were not executed in the failed run6. That failed
+before its first final run from cases that were not executed in the failed run6. That failed
 run exposed the old test 20 plus old calibration cases `001/002/004/005`; those 24 are now
 calibration/error-analysis evidence and are not called unseen. The v2 test set is disjoint
-from all 24 and is the only set called the unseen final holdout, narrowly meaning unseen in
-prior benchmark execution rather than secret in this public repository.
+from all 24 and was first formally executed in published run `31778419786`. A new run on the
+unchanged split is replication/revalidation evidence, not a newly unseen holdout.
 
 The v2 selection is deterministic and stratified. From the remaining 36 old calibration
 cases, rank within category by ascending
@@ -44,9 +44,10 @@ deterministic response cap is 512 output tokens for every compared candidate.
 
 ## Claim policy
 
-The A1/A2 comparison prospectively preregisters mean TTFT reduction as the single primary
-metric on unseen split v2. P95 E2E latency reduction and median per-request throughput
-increase (using `1000 / E2E_ms` per row) are transparent secondary metrics. All three use the
+The A1/A2 comparison preserves mean TTFT reduction as the single primary metric that was
+prospectively preregistered before split v2's first run. P95 E2E latency reduction and median
+per-request throughput increase (using `1000 / E2E_ms` per row) are transparent secondary
+metrics. Replication reports disclose v2's prior execution. All three use the
 same complete 20-case paired rows and paired 95% bootstrap intervals with 5,000 resamples and
 seed `20260813`; their reducers are mean, p95, and median respectively.
 

@@ -29,11 +29,12 @@ OpenAI-compatible API  ←  selected profile  →  raw evidence + offline report
 The included workload is safe cloud incident triage over 60 original synthetic fixtures.
 Each case has an expected diagnosis, severity, read-only tool set, prohibited actions, and
 escalation behavior. Split v1's test cases were executed during failed run6 and used for error
-analysis, so they are retired from final evaluation. Before the successful final run, split v2
-selected 20 final-holdout cases from 36 never-executed candidates with a frozen
+analysis, so they are retired from final evaluation. Before its first published evaluation,
+split v2 selected 20 final-holdout cases from 36 then-unexecuted candidates with a frozen
 category-stratified hash whose only inputs were category and case ID; the other 40 cases calibrate
-tuning. Only v2 is described as the unseen final holdout. The agent never executes model-generated
-shell commands.
+tuning. Split v2 was unseen only before its first formal execution in run `31778419786`;
+later runs using the unchanged frozen membership are replication/revalidation evidence, not newly
+unseen tests. The agent never executes model-generated shell commands.
 
 ## Why this is Arm-specific
 
@@ -112,6 +113,12 @@ figures/                      generated ablation and Pareto charts
 devpost-writeup-final.md      English submission copy rendered from evidence
 submission-checklist.md       final compliance receipt
 ```
+
+`system-info.json` records CPU model/explicit Arm IDs, distro, physical/logical cores, memory,
+compiler, sockets, NUMA, affinity candidates, and normalized L1d/L1i/L2/L3 cache aggregates. If a
+runner masks any required fact, the artifact and report carry a structured limitation naming the
+field and sources checked; logical CPUs never stand in for an unknown physical-core count, and
+missing provenance is never silently treated as a complete target fingerprint.
 
 ## Requirements
 
