@@ -14,6 +14,7 @@
     nav { position:sticky; top:12px; z-index:5; display:flex; flex-wrap:wrap; gap:8px; width:max-content; max-width:100%; padding:8px; border:1px solid var(--line); border-radius:999px; background:rgba(5,11,20,.92); backdrop-filter:blur(12px); }
     nav a { color:#dbeafe; text-decoration:none; padding:7px 11px; border-radius:999px; font-size:.82rem; font-weight:700; }
     nav a:hover,nav a:focus-visible { color:#00140c; background:var(--mint); outline:none; }
+    header[id],section[id] { scroll-margin-top:88px; }
     header { display:grid; grid-template-columns:1.35fr .65fr; gap:28px; align-items:end; padding:32px 0 38px; }
     .eyebrow { color:var(--mint); letter-spacing:.16em; text-transform:uppercase; font-size:.78rem; font-weight:800; }
     h1 { font-size:clamp(2.6rem,6vw,5.8rem); line-height:.94; letter-spacing:-.055em; margin:.25em 0; max-width:900px; }
@@ -35,7 +36,7 @@
     .figure { width:100%; border:1px solid var(--line); border-radius:18px; display:block; }
     code { color:#bae6fd; }
     footer { border-top:1px solid var(--line); margin-top:42px; padding-top:24px; color:var(--muted); font-size:.88rem; }
-    @media(max-width:800px){header{grid-template-columns:1fr}.card,.card.wide{grid-column:span 12}}
+    @media(max-width:800px){header{grid-template-columns:1fr}header[id],section[id]{scroll-margin-top:176px}.card,.card.wide{grid-column:span 12}}
   </style>
 </head>
 <body><a class="skip" href="#overview">Skip to report</a><main>

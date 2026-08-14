@@ -85,6 +85,8 @@ def test_offline_report_navigation_targets_exist() -> None:
     assert {f"#{target}" for target in expected} <= set(parser.hrefs)
     assert rendered.count("<h1>") == 1
     assert 'aria-label="Report sections"' in rendered
+    assert "header[id],section[id] { scroll-margin-top:88px; }" in rendered
+    assert "header[id],section[id]{scroll-margin-top:176px}" in rendered
     assert "aaaaaaaaaaaa…" in rendered
     assert "bbbbbbbbbbbb…" in rendered
     assert "Neoverse-N2" in rendered
