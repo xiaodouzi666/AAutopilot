@@ -29,6 +29,16 @@ def test_ip_like_value_outside_exact_log_prefix_remains_sensitive() -> None:
     assert categories == {"ip_address"}
 
 
+def test_noncanonical_elapsed_shape_remains_sensitive() -> None:
+    for text in (
+        "10.60.123.200 D invalid seconds\n",
+        "10.20.123.200 T unsupported log level\n",
+    ):
+        redacted, categories = REDACTOR["redact_text"](text, allow_llama_elapsed_prefix=True)
+        assert redacted.startswith("<redacted-ip> ")
+        assert categories == {"ip_address"}
+
+
 def test_elapsed_shape_is_redacted_outside_reviewed_runtime_evidence() -> None:
     text = "0.10.168.200 D ordinary report text\n"
     redacted, categories = REDACTOR["redact_text"](text)

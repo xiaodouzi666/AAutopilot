@@ -44,7 +44,7 @@ TOKEN_PATTERNS = (
     ),
 )
 IPV4_PATTERN = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
-LLAMA_ELAPSED_PREFIX = re.compile(r"\d{1,3}\.\d{2}\.\d{3}\.\d{3}")
+LLAMA_ELAPSED_PREFIX = re.compile(r"(?:0|[1-9]\d{0,2})\.[0-5]\d\.\d{3}\.\d{3}")
 SSH_PATTERN = re.compile(r"(?<![\w.-])(?:ssh|scp)\s+(?:-[^\s]+\s+)*[^\s@]+@[^\s]+")
 
 
@@ -76,7 +76,7 @@ def sensitive_ipv4_replacement(
         allow_llama_elapsed_prefix
         and at_line_start
         and LLAMA_ELAPSED_PREFIX.fullmatch(value)
-        and re.fullmatch(r" [TDIWE] ", suffix)
+        and re.fullmatch(r" [DIWE] ", suffix)
     ):
         return value
     try:
