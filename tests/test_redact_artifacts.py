@@ -6,19 +6,24 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 REDACTOR: dict[str, Any] = runpy.run_path(str(ROOT / "scripts/redact-artifacts.py"))
+LLAMA_LOG = (
+    "0.00.002.243 I build: pinned llama.cpp\n"
+    "0.10.168.198 D que start_loop: waiting for new tasks\n"
+    "0.10.168.199 D que start_loop: processing new tasks\n"
+    "0.10.168.200 D que start_loop: update slots\n"
+)
 
 
 def test_llama_elapsed_prefix_is_not_mistaken_for_an_ip_address() -> None:
-    text = "0.10.168.200 D que start_loop: waiting for new tasks\n"
-    redacted, categories = REDACTOR["redact_text"](text, allow_llama_elapsed_prefix=True)
-    assert redacted == text
+    redacted, categories = REDACTOR["redact_text"](LLAMA_LOG, allow_llama_elapsed_prefix=True)
+    assert redacted == LLAMA_LOG
     assert categories == set()
 
 
 def test_real_ip_is_still_redacted_beside_a_llama_elapsed_prefix() -> None:
-    text = "0.10.168.200 I srv peer=10.42.0.7 public=203.0.113.8\n"
+    text = LLAMA_LOG.replace("update slots", "peer=10.42.0.7 public=203.0.113.8")
     redacted, categories = REDACTOR["redact_text"](text, allow_llama_elapsed_prefix=True)
-    assert redacted == ("0.10.168.200 I srv peer=<redacted-ip> public=<redacted-ip>\n")
+    assert redacted == LLAMA_LOG.replace("update slots", "peer=<redacted-ip> public=<redacted-ip>")
     assert categories == {"ip_address"}
 
 
@@ -60,14 +65,84 @@ def test_only_reviewed_runtime_paths_enable_elapsed_prefix_handling(tmp_path: Pa
 
 
 def test_artifact_check_uses_runtime_path_scope(tmp_path: Path) -> None:
-    text = "0.10.168.200 D que start_loop: waiting for new tasks\n"
     runtime_log = tmp_path / "runtime" / "server.stderr.log"
     runtime_log.parent.mkdir()
-    runtime_log.write_text(text, encoding="utf-8")
+    runtime_log.write_text(LLAMA_LOG, encoding="utf-8")
     ordinary_report = tmp_path / "report.txt"
-    ordinary_report.write_text(text, encoding="utf-8")
+    ordinary_report.write_text(LLAMA_LOG, encoding="utf-8")
 
     findings, scanned = REDACTOR["process_in_place"]([tmp_path], write=False)
 
     assert scanned == 2
     assert findings == [{"path": str(ordinary_report), "categories": ["ip_address"]}]
+
+
+def test_isolated_real_ip_in_runtime_evidence_is_still_redacted(tmp_path: Path) -> None:
+    for address, level in (("10.42.100.200", "W"), ("8.18.100.200", "E")):
+        runtime_log = tmp_path / "runtime" / f"{address}.stderr.log"
+        runtime_log.parent.mkdir(exist_ok=True)
+        runtime_log.write_text(f"{address} {level} isolated address\n", encoding="utf-8")
+
+        findings, scanned = REDACTOR["process_in_place"]([runtime_log], write=False)
+
+        assert scanned == 1
+        assert findings == [{"path": str(runtime_log), "categories": ["ip_address"]}]
+
+
+def test_address_sequence_cannot_bootstrap_elapsed_prefix_handling() -> None:
+    text = (
+        "10.42.100.200 W first address\n"
+        "10.42.100.201 W second address\n"
+        "10.42.100.202 W third address\n"
+    )
+    redacted, categories = REDACTOR["redact_text"](text, allow_llama_elapsed_prefix=True)
+    assert redacted.count("<redacted-ip>") == 3
+    assert categories == {"ip_address"}
+
+
+def test_elapsed_sequence_accepts_minute_rollover() -> None:
+    text = (
+        "0.59.999.998 D before rollover\n"
+        "0.59.999.999 D at rollover\n"
+        "1.00.000.001 D after rollover\n"
+    )
+    redacted, categories = REDACTOR["redact_text"](text, allow_llama_elapsed_prefix=True)
+    assert redacted == text
+    assert categories == set()
+
+
+def test_public_copy_normalizes_ambiguous_elapsed_prefix() -> None:
+    text = (
+        "0.00.001.001 D start\n"
+        "0.59.999.999 D before rollover\n"
+        "1.00.000.001 D after rollover\n"
+        "1.42.100.200 W canonical clock that is also a valid IPv4 address\n"
+    )
+    redacted, categories = REDACTOR["redact_text"](
+        text,
+        allow_llama_elapsed_prefix=True,
+        normalize_llama_elapsed_prefixes=True,
+    )
+    assert "1.42.100.200" not in redacted
+    assert "<llama-elapsed> W canonical clock" in redacted
+    assert categories == {"ip_address"}
+
+
+def test_sanitized_copy_normalizes_then_passes_strict_recheck(tmp_path: Path) -> None:
+    source = tmp_path / "artifacts"
+    runtime_log = source / "runtime" / "server.stderr.log"
+    runtime_log.parent.mkdir(parents=True)
+    runtime_log.write_text(LLAMA_LOG, encoding="utf-8")
+    destination = tmp_path / "artifacts-public"
+
+    findings, scanned = REDACTOR["sanitized_copy"](source, destination)
+
+    public_log = destination / "runtime" / runtime_log.name
+    assert scanned == 1
+    assert findings == [
+        {"path": str(runtime_log.relative_to(source)), "categories": ["ip_address"]}
+    ]
+    assert public_log.read_text(encoding="utf-8").count("<llama-elapsed>") == 4
+    public_findings, public_scanned = REDACTOR["process_in_place"]([destination], write=False)
+    assert public_scanned == 1
+    assert public_findings == []

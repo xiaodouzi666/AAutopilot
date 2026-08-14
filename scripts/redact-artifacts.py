@@ -44,7 +44,11 @@ TOKEN_PATTERNS = (
     ),
 )
 IPV4_PATTERN = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
-LLAMA_ELAPSED_PREFIX = re.compile(r"(?:0|[1-9]\d{0,2})\.[0-5]\d\.\d{3}\.\d{3}")
+LLAMA_ELAPSED_PREFIX = r"(?:0|[1-9]\d{0,2})\.[0-5]\d\.\d{3}\.\d{3}"
+LLAMA_ELAPSED_LINE = re.compile(rf"(?m)^(?P<timestamp>{LLAMA_ELAPSED_PREFIX}) (?P<level>[DIWE]) ")
+LLAMA_ELAPSED_MIN_RUN = 3
+LLAMA_ELAPSED_MAX_START_US = 5_000_000
+LLAMA_ELAPSED_MAX_GAP_US = 60_000_000
 SSH_PATTERN = re.compile(r"(?<![\w.-])(?:ssh|scp)\s+(?:-[^\s]+\s+)*[^\s@]+@[^\s]+")
 
 
@@ -63,22 +67,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def sensitive_ipv4_replacement(
-    match: re.Match[str], *, allow_llama_elapsed_prefix: bool = False
+    match: re.Match[str],
+    *,
+    protected_llama_prefixes: frozenset[int] = frozenset(),
+    normalize_llama_elapsed_prefixes: bool = False,
 ) -> str:
     value = match.group(0)
     # llama.cpp verbosity-5 logs prefix each line with an elapsed counter such as
-    # ``0.10.168.200 D``.  Some counters are also syntactically valid IPv4 addresses, but they
-    # are timing data rather than network identifiers.  Exempt only that exact line-start shape;
-    # a real address elsewhere on the same line is still redacted.
-    at_line_start = match.start() == 0 or match.string[match.start() - 1] == "\n"
-    suffix = match.string[match.end() : match.end() + 3]
-    if (
-        allow_llama_elapsed_prefix
-        and at_line_start
-        and LLAMA_ELAPSED_PREFIX.fullmatch(value)
-        and re.fullmatch(r" [DIWE] ", suffix)
-    ):
-        return value
+    # ``0.10.168.200 D``.  Some counters are also syntactically valid IPv4 addresses. Internal
+    # checks trust only a coherent timestamp sequence from reviewed runtime paths; public copies
+    # normalize every ambiguous token. A real address elsewhere on the line is always redacted.
+    if match.start() in protected_llama_prefixes:
+        return "<llama-elapsed>" if normalize_llama_elapsed_prefixes else value
     try:
         address = ipaddress.ip_address(value)
     except ValueError:
@@ -108,7 +108,32 @@ def is_llama_runtime_evidence(path: Path) -> bool:
     )
 
 
-def redact_text(text: str, *, allow_llama_elapsed_prefix: bool = False) -> tuple[str, set[str]]:
+def llama_elapsed_us(value: str) -> int:
+    minutes, seconds, milliseconds, microseconds = (int(part) for part in value.split("."))
+    return minutes * 60_000_000 + seconds * 1_000_000 + milliseconds * 1_000 + microseconds
+
+
+def protected_llama_elapsed_prefixes(text: str) -> frozenset[int]:
+    matches = list(LLAMA_ELAPSED_LINE.finditer(text))
+    if len(matches) < LLAMA_ELAPSED_MIN_RUN:
+        return frozenset()
+    timestamps = [llama_elapsed_us(match.group("timestamp")) for match in matches]
+    if timestamps[0] > LLAMA_ELAPSED_MAX_START_US:
+        return frozenset()
+    if any(
+        not 0 <= timestamps[index] - timestamps[index - 1] <= LLAMA_ELAPSED_MAX_GAP_US
+        for index in range(1, len(timestamps))
+    ):
+        return frozenset()
+    return frozenset(match.start("timestamp") for match in matches)
+
+
+def redact_text(
+    text: str,
+    *,
+    allow_llama_elapsed_prefix: bool = False,
+    normalize_llama_elapsed_prefixes: bool = False,
+) -> tuple[str, set[str]]:
     categories: set[str] = set()
     output = text
     for literal, replacement, category in private_literals():
@@ -123,10 +148,14 @@ def redact_text(text: str, *, allow_llama_elapsed_prefix: bool = False) -> tuple
     output, count = SSH_PATTERN.subn("<redacted-ssh-command>", output)
     if count:
         categories.add("ssh_command")
+    protected_prefixes = (
+        protected_llama_elapsed_prefixes(output) if allow_llama_elapsed_prefix else frozenset()
+    )
     revised = IPV4_PATTERN.sub(
         lambda match: sensitive_ipv4_replacement(
             match,
-            allow_llama_elapsed_prefix=allow_llama_elapsed_prefix,
+            protected_llama_prefixes=protected_prefixes,
+            normalize_llama_elapsed_prefixes=normalize_llama_elapsed_prefixes,
         ),
         output,
     )
@@ -173,6 +202,7 @@ def process_in_place(paths: list[Path], *, write: bool) -> tuple[list[dict[str, 
         revised, categories = redact_text(
             original,
             allow_llama_elapsed_prefix=is_llama_runtime_evidence(path),
+            normalize_llama_elapsed_prefixes=write,
         )
         if revised == original:
             continue
@@ -200,6 +230,7 @@ def sanitized_copy(source: Path, destination: Path) -> tuple[list[dict[str, obje
             revised, categories = redact_text(
                 original,
                 allow_llama_elapsed_prefix=is_llama_runtime_evidence(source_path),
+                normalize_llama_elapsed_prefixes=True,
             )
             target.write_text(revised, encoding="utf-8")
             if revised != original:
