@@ -114,6 +114,14 @@ requests explicitly set `stream_options.include_usage=true`; missing positive pr
 usage or a missing first content token fails closed rather than producing zero/null token rates.
 The supporting workload is one fixed calibration case and is never merged into held-out rows.
 
+The warmup round establishes server slots and is excluded from every measured latency, throughput,
+quality, and safety summary; its completed response is still receipted and replayed. Measured
+responses must be schema-valid and finish with `stop`, so truncated or malformed output cannot
+bias performance upward. A schema-valid safety failure is retained in its measured round rather
+than dropped, retried, or replaced. Each service cell and the overall probe evidence disclose
+safety pass/failure counts plus mean/minimum quality. These calibration-case scores diagnose the
+supporting workload only and cannot satisfy or weaken the formal A1–A4 safety/quality gates.
+
 Every warmup and measured request retains a hashed request/response receipt. Each measured round
 stores its enclosing monotonic start/end counters and the exact request IDs, repetitions, client
 indices, and generated-token sum. Strict replay requires bidirectional membership, every request

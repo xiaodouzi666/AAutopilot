@@ -244,6 +244,25 @@ def test_complete_public_derivation_replays_in_pair_and_public_only_modes(
     )
 
 
+def test_clean_crlf_evidence_is_byte_identical_and_public_derivation_succeeds(
+    tmp_path: Path,
+) -> None:
+    private = _private_bundle(tmp_path)
+    private_csv = private / "ablation-results.csv"
+    expected = b"variant,ttft_ms,e2e_ms\r\ngeneric,12.5,33.0\r\nkleidiai,9.2,27.4\r\n"
+    private_csv.write_bytes(expected)
+    public = tmp_path / "artifacts-public"
+
+    REDACTOR["sanitized_copy"](private, public)
+
+    public_csv = public / private_csv.name
+    assert private_csv.read_bytes() == expected
+    assert public_csv.read_bytes() == expected
+    assert verify_public_derivation(public, private_root=private) == []
+    receipt = json.loads((public / "public-derivation.json").read_text(encoding="utf-8"))
+    assert private_csv.name not in {change["path"] for change in receipt["changes"]}
+
+
 @pytest.mark.parametrize("target", ("requests.jsonl", "response.json"))
 def test_typed_public_tamper_fails_even_after_manifest_refresh(
     tmp_path: Path,

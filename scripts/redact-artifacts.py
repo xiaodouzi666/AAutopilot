@@ -224,7 +224,7 @@ def process_in_place(paths: list[Path], *, write: bool) -> tuple[list[dict[str, 
         if not is_text(path):
             continue
         scanned += 1
-        original = path.read_text(encoding="utf-8", errors="replace")
+        original = path.read_bytes().decode("utf-8", errors="replace")
         revised, categories = redact_text(
             original,
             allow_llama_elapsed_prefix=is_llama_runtime_evidence(path),
@@ -234,7 +234,9 @@ def process_in_place(paths: list[Path], *, write: bool) -> tuple[list[dict[str, 
             continue
         findings.append({"path": str(path), "categories": sorted(categories)})
         if write:
-            path.write_text(revised, encoding="utf-8")
+            # Decode/encode explicitly so Python's universal-newline handling cannot
+            # silently rewrite CRLF evidence while applying an unrelated redaction.
+            path.write_bytes(revised.encode("utf-8"))
     return findings, scanned
 
 
@@ -252,15 +254,21 @@ def sanitized_copy(source: Path, destination: Path) -> tuple[list[dict[str, obje
         target.parent.mkdir(parents=True, exist_ok=True)
         if is_text(source_path):
             scanned += 1
-            original = source_path.read_text(encoding="utf-8", errors="replace")
+            original = source_path.read_bytes().decode("utf-8", errors="replace")
             revised, categories = redact_text(
                 original,
                 allow_llama_elapsed_prefix=is_llama_runtime_evidence(source_path),
                 normalize_llama_elapsed_prefixes=True,
             )
-            target.write_text(revised, encoding="utf-8")
             if revised != original:
+                # Byte decoding preserves every newline sequence; writing bytes keeps
+                # CRLF/CR/LF unchanged around the text that actually needed redaction.
+                target.write_bytes(revised.encode("utf-8"))
                 findings.append({"path": str(relative), "categories": sorted(categories)})
+            else:
+                # A clean artifact must be an exact byte-for-byte public derivative.
+                # In particular, avoid Path.read_text() universal-newline conversion.
+                shutil.copy2(source_path, target)
         else:
             shutil.copy2(source_path, target)
     _refresh_public_integrity(destination)

@@ -246,7 +246,10 @@ The report generator shall produce offline-viewable HTML, Markdown, JSON, CSV, a
 
 For the supporting probes, the report must disclose the exact generic/KleidiAI build variants and
 source commit, CPU-only configuration, KleidiAI runtime marker, model filenames/bytes/checksums and
-tensor inventories, formal versus probe sample counts and failures, and p1/p2 idle/peak RSS.
+tensor inventories, formal versus probe sample counts and protocol failures, p1/p2 idle/peak RSS,
+and per-cell measured safety pass/failure counts with mean/minimum quality. Schema-valid safety
+failures remain in the supporting performance sample and are labeled calibration-only; they are
+never filtered into a favorable result or used to satisfy the formal safety gate.
 
 **Acceptance:** every headline value is programmatically traced to raw data; unresolved placeholders fail the build.
 

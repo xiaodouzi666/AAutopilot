@@ -66,12 +66,21 @@ from a64pilot.runtime.process_manager import LlamaServerProcess, find_available_
 from a64pilot.runtime.rss_sampler import process_tree_rss
 from a64pilot.schemas import BuildManifest, ModelManifest, StrictModel
 
-PROBE_SCHEMA_VERSION: Final[str] = "1.1.0"
+PROBE_SCHEMA_VERSION: Final[str] = "1.2.0"
 MIN_PROBE_REPETITIONS: Final[int] = 3
 MICRO_PROMPT_TOKENS: Final[int] = 128
 MICRO_GENERATION_TOKENS: Final[int] = 64
 SERVICE_PARALLEL_VALUES: Final[tuple[int, ...]] = (1, 2)
 SERVICE_CONTEXT_PER_SLOT: Final[int] = 2048
+_STREAM_EVIDENCE_GATE_ISSUES: Final[frozenset[str]] = frozenset(
+    {
+        "missing_first_content_token",
+        "invalid_stream_timing",
+        "invalid_prompt_tokens",
+        "invalid_completion_tokens",
+        "invalid_generation_rate",
+    }
+)
 
 
 def _finite_positive(value: float, label: str, *, allow_zero: bool = False) -> None:
@@ -190,8 +199,10 @@ class ServiceRequestProbe(StrictModel):
     completion_tokens: int = Field(gt=0)
     generation_tok_s: float = Field(gt=0)
     schema_valid: Literal[True]
-    safety_score: Literal[100.0]
+    safety_score: Literal[0.0, 100.0]
     quality_score: float = Field(ge=0, le=100)
+    issues: list[str]
+    finish_reason: Literal["stop"]
     response_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     receipt_path: str
 
@@ -289,6 +300,10 @@ class ServiceRun(StrictModel):
     warmup_receipt_paths: list[str]
     requests: list[ServiceRequestProbe]
     rounds: list[ConcurrencyRoundProbe]
+    safety_pass_count: int = Field(ge=0)
+    safety_failure_count: int = Field(ge=0)
+    quality_score_mean: float = Field(ge=0, le=100, allow_inf_nan=False)
+    quality_score_min: float = Field(ge=0, le=100, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def complete_repetitions(self) -> ServiceRun:
@@ -313,6 +328,21 @@ class ServiceRun(StrictModel):
         expected_request_count = self.repetitions * self.parallel
         if len(self.requests) != expected_request_count:
             raise ValueError("service run request count is incomplete")
+        expected_safety_passes = sum(request.safety_score == 100.0 for request in self.requests)
+        expected_safety_failures = expected_request_count - expected_safety_passes
+        if (
+            self.safety_pass_count != expected_safety_passes
+            or self.safety_failure_count != expected_safety_failures
+        ):
+            raise ValueError("service safety pass/failure summary does not replay")
+        expected_quality_mean = statistics.fmean(request.quality_score for request in self.requests)
+        expected_quality_min = min(request.quality_score for request in self.requests)
+        if not math.isclose(
+            self.quality_score_mean, expected_quality_mean, rel_tol=1e-9, abs_tol=1e-9
+        ) or not math.isclose(
+            self.quality_score_min, expected_quality_min, rel_tol=1e-9, abs_tol=1e-9
+        ):
+            raise ValueError("service quality summary does not replay")
         request_ids = {request.request_id for request in self.requests}
         if len(request_ids) != expected_request_count:
             raise ValueError("service run has duplicate request IDs")
@@ -380,6 +410,8 @@ class PerformanceProbeEvidence(StrictModel):
     matrix_complete: Literal[True]
     failed_micro_cells: Literal[0]
     failed_service_rounds: Literal[0]
+    measured_service_safety_pass_count: int = Field(ge=0)
+    measured_service_safety_failure_count: int = Field(ge=0)
 
     @model_validator(mode="after")
     def complete_matrix(self) -> PerformanceProbeEvidence:
@@ -420,6 +452,12 @@ class PerformanceProbeEvidence(StrictModel):
             raise ValueError("p1/p2 service matrix is incomplete")
         if any(run.repetitions != self.repetitions for run in self.service_runs):
             raise ValueError("service repetition count is inconsistent")
+        if self.measured_service_safety_pass_count != sum(
+            run.safety_pass_count for run in self.service_runs
+        ) or self.measured_service_safety_failure_count != sum(
+            run.safety_failure_count for run in self.service_runs
+        ):
+            raise ValueError("probe safety pass/failure totals do not replay")
         service_settings = {
             (
                 run.model_file_sha256,
@@ -515,6 +553,17 @@ class _ModelInputs:
     quantization: Literal["Q4_0", "Q8_0"]
     sha256: str
     proof: ModelInventoryProof
+
+
+@dataclass(frozen=True, slots=True)
+class _CompletionProbeResult:
+    """Receipt metadata shared by measured and explicitly unmeasured requests."""
+
+    request_id: str
+    receipt_path: str
+    measured_probe: ServiceRequestProbe | None
+    gate_issue_codes: tuple[str, ...]
+    validation_context: dict[str, Any]
 
 
 def micro_thread_candidates(full_threads: int) -> tuple[int, int]:
@@ -716,6 +765,98 @@ def _micro_run(
     )
 
 
+def _safe_finish_reason(value: Any) -> str:
+    """Return a bounded log-safe finish reason without reflecting upstream text."""
+
+    if isinstance(value, str) and re.fullmatch(r"[a-z_]{1,32}", value):
+        return value
+    return "unknown"
+
+
+def _validation_context(
+    *,
+    backend: Literal["generic", "kleidiai"],
+    parallel: Literal[1, 2],
+    phase: Literal["warmup", "measured"],
+    repetition: int,
+    client_index: int,
+    schema_valid: bool,
+    safety_score: float,
+    issue_codes: tuple[str, ...],
+    gate_issue_codes: tuple[str, ...],
+    finish_reason: Any,
+    response_sha256: str,
+) -> dict[str, Any]:
+    safe_issue_codes = sorted(
+        {
+            code if re.fullmatch(r"[a-z0-9_]{1,64}", code) else "unknown_issue"
+            for code in issue_codes
+        }
+    )
+    return {
+        "backend": backend,
+        "parallel": parallel,
+        "phase": phase,
+        "repetition": repetition,
+        "client_index": client_index,
+        "schema_valid": schema_valid,
+        "safety_score": safety_score,
+        "issue_codes": safe_issue_codes,
+        "gate_issue_codes": sorted(set(gate_issue_codes)),
+        "finish_reason": _safe_finish_reason(finish_reason),
+        "response_sha256": response_sha256,
+    }
+
+
+def _completion_gate_issue_codes(
+    *,
+    start_ns: Any,
+    first_content_token_ns: Any,
+    end_ns: Any,
+    prompt_tokens: Any,
+    completion_tokens: Any,
+    generation_rate: float | None,
+    schema_valid: bool,
+    finish_reason: Any,
+) -> tuple[str, ...]:
+    issues: list[str] = []
+    if first_content_token_ns is None:
+        issues.append("missing_first_content_token")
+    elif not (
+        type(start_ns) is int
+        and type(first_content_token_ns) is int
+        and type(end_ns) is int
+        and start_ns < first_content_token_ns < end_ns
+    ):
+        issues.append("invalid_stream_timing")
+    if type(prompt_tokens) is not int or prompt_tokens <= 0:
+        issues.append("invalid_prompt_tokens")
+    if type(completion_tokens) is not int or completion_tokens <= 0:
+        issues.append("invalid_completion_tokens")
+    if generation_rate is None or not math.isfinite(generation_rate) or generation_rate <= 0:
+        issues.append("invalid_generation_rate")
+    if not schema_valid:
+        issues.append("schema_invalid")
+    if finish_reason != "stop":
+        issues.append("non_stop_finish")
+    return tuple(issues)
+
+
+def _validation_failure_message(context: dict[str, Any]) -> str:
+    issue_codes = ",".join(context["issue_codes"]) or "none"
+    gate_issue_codes = ",".join(context["gate_issue_codes"]) or "none"
+    schema_valid = str(context["schema_valid"]).lower()
+    return (
+        f"backend={context['backend']} parallel={context['parallel']} "
+        f"phase={context['phase']} repetition={context['repetition']} "
+        f"client_index={context['client_index']} schema_valid={schema_valid} "
+        f"safety_score={context['safety_score']} issue_codes={issue_codes} "
+        f"gate_issue_codes={gate_issue_codes} "
+        f"finish_reason={context['finish_reason']} "
+        f"response_sha256={context['response_sha256']}"
+    )
+
+
 def _completion_probe(
     completion: ClientCompletion,
     *,
@@ -728,26 +869,29 @@ def _completion_probe(
     model_alias: str,
     receipt_dir: Path,
     artifacts_dir: Path,
-) -> ServiceRequestProbe:
+) -> _CompletionProbeResult:
     timing = completion.timing
     prompt_tokens = completion.usage.get("prompt_tokens")
     completion_tokens = completion.usage.get("completion_tokens")
-    if (
-        timing.first_content_token_ns is None
-        or type(prompt_tokens) is not int
-        or prompt_tokens <= 0
-        or type(completion_tokens) is not int
-        or completion_tokens <= 0
-    ):
-        raise PerformanceProbeError("service probe lacks streaming token-usage evidence")
     generation_rate = completion.generation_tokens_per_second
-    if generation_rate is None or generation_rate <= 0:
-        raise PerformanceProbeError("service probe has no replayable generation rate")
     score = score_case(case, completion.text)
-    if not score.schema_valid or score.safety_score != 100.0:
-        raise PerformanceProbeError("service performance probe failed schema/safety validation")
     request_id = uuid4().hex
     receipt_path = receipt_dir / f"{phase}-r{repetition}-c{client_index}-{request_id}.json"
+    response_sha256 = hashlib.sha256(completion.text.encode("utf-8")).hexdigest()
+    choices = completion.payload.get("choices")
+    finish_reason = None
+    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        finish_reason = choices[0].get("finish_reason")
+    gate_issue_codes = _completion_gate_issue_codes(
+        start_ns=timing.start_ns,
+        first_content_token_ns=timing.first_content_token_ns,
+        end_ns=timing.end_ns,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        generation_rate=generation_rate,
+        schema_valid=score.schema_valid,
+        finish_reason=finish_reason,
+    )
     request_payload = {
         "case_id": case.case_id,
         "phase": phase,
@@ -766,7 +910,7 @@ def _completion_probe(
     response_payload = {
         "content": completion.text,
         "usage": dict(completion.usage),
-        "finish_reason": completion.payload.get("choices", [{}])[0].get("finish_reason"),
+        "finish_reason": finish_reason,
         "timing": {
             "start_ns": timing.start_ns,
             "first_content_token_ns": timing.first_content_token_ns,
@@ -776,6 +920,20 @@ def _completion_probe(
         },
         "score": score.as_dict(),
     }
+    validation_context = _validation_context(
+        backend=backend,
+        parallel=parallel,
+        phase=phase,
+        repetition=repetition,
+        client_index=client_index,
+        schema_valid=score.schema_valid,
+        safety_score=score.safety_score,
+        issue_codes=score.issues,
+        gate_issue_codes=gate_issue_codes,
+        finish_reason=finish_reason,
+        response_sha256=response_sha256,
+    )
+    response_payload["validation_context"] = validation_context
     write_json(
         receipt_path,
         {
@@ -785,7 +943,31 @@ def _completion_probe(
             "response": response_payload,
         },
     )
-    return ServiceRequestProbe(
+    relative_receipt_path = _relative(receipt_path, artifacts_dir)
+    # Warmup establishes server slots but is not a measured quality or performance
+    # sample. Its raw response and replayable score remain in the evidence receipt;
+    # measured requests retain the strict schema/completeness gate below.
+    if phase == "warmup":
+        return _CompletionProbeResult(
+            request_id=request_id,
+            receipt_path=relative_receipt_path,
+            measured_probe=None,
+            gate_issue_codes=gate_issue_codes,
+            validation_context=validation_context,
+        )
+    if gate_issue_codes:
+        return _CompletionProbeResult(
+            request_id=request_id,
+            receipt_path=relative_receipt_path,
+            measured_probe=None,
+            gate_issue_codes=gate_issue_codes,
+            validation_context=validation_context,
+        )
+    assert timing.first_content_token_ns is not None
+    assert type(prompt_tokens) is int
+    assert type(completion_tokens) is int
+    assert generation_rate is not None
+    measured_probe = ServiceRequestProbe(
         request_id=request_id,
         backend=backend,
         parallel=parallel,
@@ -800,10 +982,19 @@ def _completion_probe(
         completion_tokens=completion_tokens,
         generation_tok_s=generation_rate,
         schema_valid=True,
-        safety_score=100.0,
+        safety_score=score.safety_score,
         quality_score=score.quality_score,
-        response_sha256=hashlib.sha256(completion.text.encode("utf-8")).hexdigest(),
-        receipt_path=_relative(receipt_path, artifacts_dir),
+        issues=list(score.issues),
+        finish_reason="stop",
+        response_sha256=response_sha256,
+        receipt_path=relative_receipt_path,
+    )
+    return _CompletionProbeResult(
+        request_id=request_id,
+        receipt_path=relative_receipt_path,
+        measured_probe=measured_probe,
+        gate_issue_codes=(),
+        validation_context=validation_context,
     )
 
 
@@ -819,7 +1010,7 @@ async def _request_round(
     receipt_dir: Path,
     artifacts_dir: Path,
     deadline: float,
-) -> tuple[list[ServiceRequestProbe], ConcurrencyRoundProbe]:
+) -> tuple[list[ServiceRequestProbe], ConcurrencyRoundProbe | None, list[str]]:
     messages = build_messages(case.incident)
 
     async def one(client_index: int) -> ClientCompletion:
@@ -844,7 +1035,7 @@ async def _request_round(
     except TimeoutError as exc:
         raise PerformanceProbeError("service probe round exceeded the hard runtime budget") from exc
     ended = time.monotonic_ns()
-    requests = [
+    outcomes = [
         _completion_probe(
             completion,
             case=case,
@@ -859,10 +1050,39 @@ async def _request_round(
         )
         for index, completion in enumerate(completions)
     ]
+    receipt_paths = [outcome.receipt_path for outcome in outcomes]
+    if phase == "warmup":
+        failed = [
+            outcome
+            for outcome in outcomes
+            if _STREAM_EVIDENCE_GATE_ISSUES.intersection(outcome.gate_issue_codes)
+        ]
+        if failed:
+            diagnostics = "; ".join(
+                _validation_failure_message(outcome.validation_context) for outcome in failed
+            )
+            raise PerformanceProbeError(
+                "service warmup probe failed streaming-evidence validation "
+                f"({len(failed)}/{parallel} requests): {diagnostics}"
+            )
+        return [], None, receipt_paths
+    failed = [outcome for outcome in outcomes if outcome.gate_issue_codes]
+    if failed:
+        diagnostics = "; ".join(
+            _validation_failure_message(outcome.validation_context) for outcome in failed
+        )
+        raise PerformanceProbeError(
+            "service measured probe failed schema/completeness validation "
+            f"({len(failed)}/{parallel} requests): {diagnostics}"
+        )
+    requests = [outcome.measured_probe for outcome in outcomes]
+    if any(request is None for request in requests):
+        raise PerformanceProbeError("service probe produced inconsistent phase accounting")
+    measured_requests = [request for request in requests if request is not None]
     wall_ms = (ended - started) / 1_000_000
     seconds = wall_ms / 1000
-    generated_tokens = sum(request.completion_tokens for request in requests)
-    return requests, ConcurrencyRoundProbe(
+    generated_tokens = sum(request.completion_tokens for request in measured_requests)
+    round_probe = ConcurrencyRoundProbe(
         backend=backend,
         parallel=parallel,
         repetition=repetition,
@@ -874,8 +1094,9 @@ async def _request_round(
         generated_tokens=generated_tokens,
         requests_per_second=parallel / seconds,
         generated_tokens_per_second=generated_tokens / seconds,
-        request_ids=[request.request_id for request in requests],
+        request_ids=[request.request_id for request in measured_requests],
     )
+    return measured_requests, round_probe, receipt_paths
 
 
 async def _service_run(
@@ -959,7 +1180,7 @@ async def _service_run(
             timeout_s=min(240.0, _remaining_seconds(deadline)),
         ) as client:
             # One unmeasured parallel warmup round establishes every server slot.
-            warmup_requests, _ = await _request_round(
+            _, _, warmup_receipt_paths = await _request_round(
                 client,
                 case=case,
                 backend=inputs.backend,
@@ -971,9 +1192,8 @@ async def _service_run(
                 artifacts_dir=artifacts_dir,
                 deadline=deadline,
             )
-            warmup_receipt_paths = [request.receipt_path for request in warmup_requests]
             for repetition in range(repetitions):
-                round_requests, round_probe = await _request_round(
+                round_requests, round_probe, _ = await _request_round(
                     client,
                     case=case,
                     backend=inputs.backend,
@@ -985,6 +1205,8 @@ async def _service_run(
                     artifacts_dir=artifacts_dir,
                     deadline=deadline,
                 )
+                if round_probe is None:
+                    raise PerformanceProbeError("measured service round lacks a round receipt")
                 requests.extend(round_requests)
                 rounds.append(round_probe)
         log_text = manager.log_text()
@@ -1058,6 +1280,10 @@ async def _service_run(
             warmup_receipt_paths=warmup_receipt_paths,
             requests=requests,
             rounds=rounds,
+            safety_pass_count=sum(request.safety_score == 100.0 for request in requests),
+            safety_failure_count=sum(request.safety_score != 100.0 for request in requests),
+            quality_score_mean=statistics.fmean(request.quality_score for request in requests),
+            quality_score_min=min(request.quality_score for request in requests),
         )
     finally:
         manager.stop()
@@ -1227,6 +1453,8 @@ async def run_performance_probes(
         matrix_complete=True,
         failed_micro_cells=0,
         failed_service_rounds=0,
+        measured_service_safety_pass_count=sum(run.safety_pass_count for run in service_runs),
+        measured_service_safety_failure_count=sum(run.safety_failure_count for run in service_runs),
     )
     write_json(output_path, evidence)
     return evidence
@@ -1435,11 +1663,19 @@ def _replay_request_receipt(
     repetition: int,
     client_index: int,
     record: ServiceRequestProbe | None,
-) -> None:
+) -> str:
     try:
         receipt = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"invalid service request receipt: {path.name}") from exc
+    request_id = receipt.get("request_id")
+    if (
+        receipt.get("schema_version") != PROBE_SCHEMA_VERSION
+        or not isinstance(request_id, str)
+        or re.fullmatch(r"[0-9a-f]{32}", request_id) is None
+        or not path.stem.endswith(request_id)
+    ):
+        raise ValueError("service request receipt identity/version is invalid")
     request = receipt.get("request")
     response = receipt.get("response")
     if not isinstance(request, dict) or not isinstance(response, dict):
@@ -1467,34 +1703,69 @@ def _replay_request_receipt(
     if not isinstance(content, str) or not isinstance(usage, dict) or not isinstance(timing, dict):
         raise ValueError("service response receipt is incomplete")
     score = score_case(case, content)
-    if (
-        response.get("score") != score.as_dict()
-        or not score.schema_valid
-        or score.safety_score != 100
-    ):
+    if response.get("score") != score.as_dict():
         raise ValueError("service response score does not replay")
     prompt_tokens = usage.get("prompt_tokens")
     completion_tokens = usage.get("completion_tokens")
-    if (
-        type(prompt_tokens) is not int
-        or prompt_tokens <= 0
-        or type(completion_tokens) is not int
-        or completion_tokens <= 0
-    ):
-        raise ValueError("service response receipt lacks positive token usage")
     start_ns = timing.get("start_ns")
     first_ns = timing.get("first_content_token_ns")
     end_ns = timing.get("end_ns")
-    if not all(type(value) is int for value in (start_ns, first_ns, end_ns)) or not (
-        start_ns < first_ns < end_ns
+    if type(start_ns) is not int or type(end_ns) is not int or not start_ns < end_ns:
+        raise ValueError("service response receipt has invalid start/end counters")
+    expected_e2e_ms = (end_ns - start_ns) / 1_000_000
+    if not isinstance(timing.get("e2e_ms"), (int, float)) or not math.isclose(
+        timing["e2e_ms"], expected_e2e_ms, rel_tol=1e-9, abs_tol=1e-9
     ):
-        raise ValueError("service response receipt has invalid monotonic counters")
+        raise ValueError("service response e2e timing does not replay")
+    generation_rate = None
+    if type(first_ns) is int and start_ns < first_ns < end_ns:
+        expected_ttft_ms = (first_ns - start_ns) / 1_000_000
+        if not isinstance(timing.get("ttft_ms"), (int, float)) or not math.isclose(
+            timing["ttft_ms"], expected_ttft_ms, rel_tol=1e-9, abs_tol=1e-9
+        ):
+            raise ValueError("service response TTFT does not replay")
+        if type(completion_tokens) is int and completion_tokens > 0:
+            generation_rate = completion_tokens / ((end_ns - first_ns) / 1_000_000_000)
+    elif first_ns is None:
+        if timing.get("ttft_ms") is not None:
+            raise ValueError("service response missing-first-token timing is inconsistent")
+    else:
+        raise ValueError("service response receipt has invalid first-token counter")
+    gate_issue_codes = _completion_gate_issue_codes(
+        start_ns=start_ns,
+        first_content_token_ns=first_ns,
+        end_ns=end_ns,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        generation_rate=generation_rate,
+        schema_valid=score.schema_valid,
+        finish_reason=response.get("finish_reason"),
+    )
+    expected_validation_context = _validation_context(
+        backend=backend,
+        parallel=parallel,
+        phase=phase,
+        repetition=repetition,
+        client_index=client_index,
+        schema_valid=score.schema_valid,
+        safety_score=score.safety_score,
+        issue_codes=score.issues,
+        gate_issue_codes=gate_issue_codes,
+        finish_reason=response.get("finish_reason"),
+        response_sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    )
+    if response.get("validation_context") != expected_validation_context:
+        raise ValueError("service response validation context does not replay")
+    if phase == "measured" and gate_issue_codes:
+        raise ValueError("measured service response failed schema/completeness replay")
+    if phase == "warmup" and _STREAM_EVIDENCE_GATE_ISSUES.intersection(gate_issue_codes):
+        raise ValueError("warmup service response failed streaming-evidence replay")
     if record is None:
-        if not receipt.get("request_id") or phase != "warmup":
+        if phase != "warmup":
             raise ValueError("warmup receipt identity is invalid")
-        return
+        return request_id
     expected_record = {
-        "request_id": receipt.get("request_id"),
+        "request_id": request_id,
         "start_ns": timing.get("start_ns"),
         "first_content_token_ns": timing.get("first_content_token_ns"),
         "end_ns": timing.get("end_ns"),
@@ -1505,11 +1776,14 @@ def _replay_request_receipt(
         "schema_valid": score.schema_valid,
         "safety_score": score.safety_score,
         "quality_score": score.quality_score,
+        "issues": list(score.issues),
+        "finish_reason": response.get("finish_reason"),
         "response_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
     actual_record = {key: getattr(record, key) for key in expected_record}
     if actual_record != expected_record:
         raise ValueError("service request summary does not replay from its receipt")
+    return request_id
 
 
 def _replay_probe_semantics(
@@ -1672,17 +1946,26 @@ def _replay_probe_semantics(
             raise ValueError("service peak RSS does not replay from raw samples")
         _safe_raw_path(artifacts_dir, raw_root, run.stdout_path, evidence)
         _safe_raw_path(artifacts_dir, raw_root, run.stderr_path, evidence)
+        warmup_request_ids = []
         for client_index, relative in enumerate(run.warmup_receipt_paths):
-            _replay_request_receipt(
-                path=_safe_raw_path(artifacts_dir, raw_root, relative, evidence),
-                case=case,
-                backend=run.backend,
-                parallel=run.parallel,
-                phase="warmup",
-                repetition=0,
-                client_index=client_index,
-                record=None,
+            warmup_request_ids.append(
+                _replay_request_receipt(
+                    path=_safe_raw_path(artifacts_dir, raw_root, relative, evidence),
+                    case=case,
+                    backend=run.backend,
+                    parallel=run.parallel,
+                    phase="warmup",
+                    repetition=0,
+                    client_index=client_index,
+                    record=None,
+                )
             )
+        measured_request_ids = {request.request_id for request in run.requests}
+        if (
+            len(set(warmup_request_ids)) != run.parallel
+            or set(warmup_request_ids) & measured_request_ids
+        ):
+            raise ValueError("warmup request IDs are duplicate or overlap measured requests")
         for request in run.requests:
             _replay_request_receipt(
                 path=_safe_raw_path(artifacts_dir, raw_root, request.receipt_path, evidence),
@@ -1789,6 +2072,10 @@ def summarize_performance_probes(evidence: PerformanceProbeEvidence) -> dict[str
                 "peak_rss_mb": run.peak_rss_bytes / (1024 * 1024),
                 "context_total": run.context_total,
                 "context_per_slot": run.context_per_slot,
+                "safety_pass_count": run.safety_pass_count,
+                "safety_failure_count": run.safety_failure_count,
+                "quality_score_mean": run.quality_score_mean,
+                "quality_score_min": run.quality_score_min,
             }
         )
     return {
@@ -1808,6 +2095,8 @@ def summarize_performance_probes(evidence: PerformanceProbeEvidence) -> dict[str
         "service_requests": sum(len(run.requests) for run in evidence.service_runs),
         "failed_micro_cells": evidence.failed_micro_cells,
         "failed_service_rounds": evidence.failed_service_rounds,
+        "measured_service_safety_pass_count": (evidence.measured_service_safety_pass_count),
+        "measured_service_safety_failure_count": (evidence.measured_service_safety_failure_count),
         "semantic_replay_verified": True,
         "reproduction_commands": [
             (

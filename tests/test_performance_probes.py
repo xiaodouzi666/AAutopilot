@@ -9,6 +9,7 @@ from contextlib import suppress
 from pathlib import Path
 
 import pytest
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pydantic import ValidationError
 
 import a64pilot.benchmark.probes as probes_module
@@ -42,6 +43,7 @@ from a64pilot.models.gguf import GgufTensor, ModelInventoryProof
 from a64pilot.models.registry import get_model
 from a64pilot.provenance import sha256_file, write_json
 from a64pilot.runtime.llama_command import LlamaServerConfig, build_llama_server_command
+from a64pilot.runtime.openai_client import ClientCompletion, RequestTiming
 
 ROOT = Path(__file__).parents[1]
 SESSION_ID = "a" * 32
@@ -79,6 +81,27 @@ def _response_text(case: object) -> str:
         needs_escalation=case.expected_escalation,
     )
     return response.model_dump_json()
+
+
+def _client_completion(text: str, *, finish_reason: str = "stop") -> ClientCompletion:
+    return ClientCompletion(
+        payload={
+            "choices": [{"finish_reason": finish_reason}],
+            "usage": {"prompt_tokens": 64, "completion_tokens": 10, "total_tokens": 74},
+        },
+        text=text,
+        timing=RequestTiming(
+            start_ns=1_000_000_000,
+            first_content_token_ns=1_010_000_000,
+            end_ns=1_110_000_000,
+        ),
+    )
+
+
+def _unsafe_response_text(case: object) -> str:
+    payload = json.loads(_response_text(case))
+    payload["safe_next_action"] = "Restart the service immediately."
+    return json.dumps(payload, separators=(",", ":"))
 
 
 def _reviewed_proof(model_id: str) -> dict[str, object]:
@@ -200,6 +223,19 @@ def _request_receipt(
             "finish_reason": "stop",
             "timing": timing,
             "score": score.as_dict(),
+            "validation_context": {
+                "backend": backend,
+                "parallel": parallel,
+                "phase": phase,
+                "repetition": repetition,
+                "client_index": client_index,
+                "schema_valid": score.schema_valid,
+                "safety_score": score.safety_score,
+                "issue_codes": sorted(set(score.issues)),
+                "gate_issue_codes": [],
+                "finish_reason": "stop",
+                "response_sha256": hashlib.sha256(content.encode()).hexdigest(),
+            },
         },
     }
     write_json(path, receipt)
@@ -407,6 +443,8 @@ def _build_fixture(tmp_path: Path) -> tuple[Path, PerformanceProbeEvidence]:
                         schema_valid=True,
                         safety_score=100.0,
                         quality_score=score.quality_score,
+                        issues=list(score.issues),
+                        finish_reason="stop",
                         response_sha256=hashlib.sha256(content.encode()).hexdigest(),
                         receipt_path=path.relative_to(artifacts).as_posix(),
                     )
@@ -461,6 +499,11 @@ def _build_fixture(tmp_path: Path) -> tuple[Path, PerformanceProbeEvidence]:
                     warmup_receipt_paths=warmup_paths,
                     requests=requests,
                     rounds=rounds,
+                    safety_pass_count=len(requests),
+                    safety_failure_count=0,
+                    quality_score_mean=sum(request.quality_score for request in requests)
+                    / len(requests),
+                    quality_score_min=min(request.quality_score for request in requests),
                 )
             )
 
@@ -501,6 +544,8 @@ def _build_fixture(tmp_path: Path) -> tuple[Path, PerformanceProbeEvidence]:
         matrix_complete=True,
         failed_micro_cells=0,
         failed_service_rounds=0,
+        measured_service_safety_pass_count=sum(run.safety_pass_count for run in service_runs),
+        measured_service_safety_failure_count=0,
     )
     path = artifacts / "performance-probes.json"
     write_json(path, evidence)
@@ -533,6 +578,13 @@ def test_semantic_loader_replays_micro_stdout_and_exact_command(tmp_path: Path) 
     assert summary["semantic_replay_verified"] is True
     assert len(summary["micro"]) == 12
     assert all(row["idle_rss_mb"] > 0 for row in summary["service"])
+    assert summary["measured_service_safety_failure_count"] == 0
+    assert all(
+        row["safety_pass_count"] == row["requests"]
+        and row["safety_failure_count"] == 0
+        and row["quality_score_mean"] >= row["quality_score_min"]
+        for row in summary["service"]
+    )
 
     payload = evidence.model_dump(mode="json")
     payload["micro_runs"][0]["metrics"][0]["tokens_per_second"] = 999.0
@@ -548,6 +600,51 @@ def test_semantic_loader_replays_micro_stdout_and_exact_command(tmp_path: Path) 
     payload["micro_runs"][0]["command"].remove("-v")
     with pytest.raises(ValidationError, match="exactly one canonical -v"):
         PerformanceProbeEvidence.model_validate(payload)
+
+
+def test_probe_report_tables_disclose_unfiltered_safety_and_quality(tmp_path: Path) -> None:
+    _, evidence = _build_fixture(tmp_path)
+    summary = summarize_performance_probes(evidence)
+    environment = Environment(
+        loader=FileSystemLoader(ROOT / "templates"),
+        undefined=StrictUndefined,
+        autoescape=False,
+    )
+    context = {
+        "generated_at": "2026-08-14T00:00:00Z",
+        "evidence_status": "measured",
+        "measurement_count": 0,
+        "fixture_count": 0,
+        "claims": [],
+        "summaries": [],
+        "limitations": [],
+        "system": None,
+        "build": None,
+        "models": None,
+        "cascade_status": None,
+        "cascade_quality": None,
+        "cases_sha256": "a" * 64,
+        "split_sha256": "b" * 64,
+        "split_schema_version": "2.0",
+        "primary_claim_id": "fixture-primary",
+        "formal_repetitions_per_case": 1,
+        "formal_sample_disclosure": {
+            "paired_case_count": 20,
+            "measured_rows": 40,
+            "expected_rows": 40,
+            "failed_or_missing_rows": 0,
+        },
+        "performance_probes": summary,
+        "probe_provenance": None,
+    }
+    html = environment.get_template("report.html.j2").render(**context)
+    markdown = environment.get_template("report.md.j2").render(**context)
+    for rendered in (html, markdown):
+        assert "Safety pass / fail" in rendered
+        assert "Quality mean / min" in rendered
+        assert "recorded safety failures" in rendered
+        assert "retained without filtering" in rendered
+        assert "not dropped or retried" in rendered
 
 
 def test_service_round_membership_tokens_wall_and_receipt_replay(tmp_path: Path) -> None:
@@ -586,6 +683,55 @@ def test_service_round_membership_tokens_wall_and_receipt_replay(tmp_path: Path)
     payload["raw_files"][request["receipt_path"]] = sha256_file(receipt_path)
     write_json(path, payload)
     with pytest.raises(ValueError, match="summary does not replay"):
+        load_performance_probes(path, project_root=ROOT)
+
+
+def test_measured_safety_and_issue_summaries_are_receipt_bound(tmp_path: Path) -> None:
+    path, evidence = _build_fixture(tmp_path)
+    payload = evidence.model_dump(mode="json")
+    run = payload["service_runs"][0]
+    request = run["requests"][0]
+    request["safety_score"] = 0.0
+    request["issues"] = ["case_prohibited_action"]
+    run["safety_pass_count"] -= 1
+    run["safety_failure_count"] += 1
+    payload["measured_service_safety_pass_count"] -= 1
+    payload["measured_service_safety_failure_count"] += 1
+    write_json(path, payload)
+    with pytest.raises(ValueError, match="summary does not replay"):
+        load_performance_probes(path, project_root=ROOT)
+
+    path, evidence = _build_fixture(tmp_path / "issues")
+    payload = evidence.model_dump(mode="json")
+    payload["service_runs"][0]["requests"][0]["issues"] = ["tampered_issue"]
+    write_json(path, payload)
+    with pytest.raises(ValueError, match="summary does not replay"):
+        load_performance_probes(path, project_root=ROOT)
+
+
+def test_warmup_receipt_version_and_timing_are_strictly_replayed(tmp_path: Path) -> None:
+    path, evidence = _build_fixture(tmp_path)
+    payload = evidence.model_dump(mode="json")
+    relative = payload["service_runs"][0]["warmup_receipt_paths"][0]
+    receipt_path = path.parent / relative
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["schema_version"] = "0.0.0"
+    write_json(receipt_path, receipt)
+    payload["raw_files"][relative] = sha256_file(receipt_path)
+    write_json(path, payload)
+    with pytest.raises(ValueError, match="identity/version"):
+        load_performance_probes(path, project_root=ROOT)
+
+    path, evidence = _build_fixture(tmp_path / "timing")
+    payload = evidence.model_dump(mode="json")
+    relative = payload["service_runs"][0]["warmup_receipt_paths"][0]
+    receipt_path = path.parent / relative
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["response"]["timing"]["ttft_ms"] += 1
+    write_json(receipt_path, receipt)
+    payload["raw_files"][relative] = sha256_file(receipt_path)
+    write_json(path, payload)
+    with pytest.raises(ValueError, match="TTFT"):
         load_performance_probes(path, project_root=ROOT)
 
 
@@ -647,6 +793,264 @@ def test_probe_matrix_context_and_semantic_fingerprint_are_strict(tmp_path: Path
     assert performance_probe_semantic_sha256(public_replayed) == (
         performance_probe_semantic_sha256(evidence)
     )
+
+
+def test_invalid_warmup_is_receipted_but_excluded_from_measured_requests(
+    tmp_path: Path,
+) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+
+    class InvalidClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            return _client_completion("not-json", finish_reason="length")
+
+    requests, round_probe, receipt_paths = asyncio.run(
+        _request_round(
+            InvalidClient(),
+            case=case,
+            backend="generic",
+            parallel=2,
+            repetition=0,
+            model_alias="probe-generic-p2",
+            phase="warmup",
+            receipt_dir=tmp_path / "raw" / "requests",
+            artifacts_dir=tmp_path,
+            deadline=10**12,
+        )
+    )
+
+    assert requests == []
+    assert round_probe is None
+    assert len(receipt_paths) == 2
+    for client_index, relative in enumerate(receipt_paths):
+        receipt = json.loads((tmp_path / relative).read_text(encoding="utf-8"))
+        assert receipt["request"]["phase"] == "warmup"
+        assert receipt["request"]["client_index"] == client_index
+        context = receipt["response"]["validation_context"]
+        assert context == {
+            "backend": "generic",
+            "parallel": 2,
+            "phase": "warmup",
+            "repetition": 0,
+            "client_index": client_index,
+            "schema_valid": False,
+            "safety_score": 0.0,
+            "issue_codes": ["schema_invalid"],
+            "gate_issue_codes": ["non_stop_finish", "schema_invalid"],
+            "finish_reason": "length",
+            "response_sha256": hashlib.sha256(b"not-json").hexdigest(),
+        }
+
+
+def test_warmup_missing_stream_usage_is_receipted_then_fails_closed(tmp_path: Path) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+
+    class MissingUsageClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            completion = _client_completion(_response_text(case))
+            return ClientCompletion(
+                payload={"choices": [{"finish_reason": "stop"}], "usage": {}},
+                text=completion.text,
+                timing=completion.timing,
+            )
+
+    with pytest.raises(PerformanceProbeError, match="warmup probe failed streaming-evidence"):
+        asyncio.run(
+            _request_round(
+                MissingUsageClient(),
+                case=case,
+                backend="generic",
+                parallel=1,
+                repetition=0,
+                model_alias="probe-generic-p1",
+                phase="warmup",
+                receipt_dir=tmp_path / "raw" / "requests",
+                artifacts_dir=tmp_path,
+                deadline=10**12,
+            )
+        )
+    receipts = list((tmp_path / "raw" / "requests").glob("*.json"))
+    assert len(receipts) == 1
+    receipt = json.loads(receipts[0].read_text(encoding="utf-8"))
+    assert receipt["response"]["validation_context"]["gate_issue_codes"] == [
+        "invalid_completion_tokens",
+        "invalid_generation_rate",
+        "invalid_prompt_tokens",
+    ]
+
+
+def test_invalid_measured_request_fails_closed_with_safe_durable_context(
+    tmp_path: Path,
+) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+    raw_response = "private-response-body-must-not-appear-in-the-error"
+
+    class InvalidClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            return _client_completion(raw_response, finish_reason="length")
+
+    with pytest.raises(PerformanceProbeError) as captured:
+        asyncio.run(
+            _request_round(
+                InvalidClient(),
+                case=case,
+                backend="kleidiai",
+                parallel=1,
+                repetition=2,
+                model_alias="probe-kleidiai-p1",
+                phase="measured",
+                receipt_dir=tmp_path / "raw" / "requests",
+                artifacts_dir=tmp_path,
+                deadline=10**12,
+            )
+        )
+
+    message = str(captured.value)
+    assert raw_response not in message
+    assert "backend=kleidiai parallel=1 phase=measured repetition=2 client_index=0" in message
+    assert "schema_valid=false safety_score=0.0 issue_codes=schema_invalid" in message
+    assert "gate_issue_codes=non_stop_finish,schema_invalid" in message
+    assert "finish_reason=length" in message
+    assert hashlib.sha256(raw_response.encode()).hexdigest() in message
+    receipts = list((tmp_path / "raw" / "requests").glob("*.json"))
+    assert len(receipts) == 1
+    receipt = json.loads(receipts[0].read_text(encoding="utf-8"))
+    assert receipt["response"]["content"] == raw_response
+    assert receipt["response"]["validation_context"]["phase"] == "measured"
+
+
+def test_schema_valid_unsafe_measured_request_is_retained_without_filtering(
+    tmp_path: Path,
+) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+    unsafe_response = _unsafe_response_text(case)
+
+    class UnsafeClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            return _client_completion(unsafe_response)
+
+    requests, round_probe, receipt_paths = asyncio.run(
+        _request_round(
+            UnsafeClient(),
+            case=case,
+            backend="generic",
+            parallel=1,
+            repetition=0,
+            model_alias="probe-generic-p1",
+            phase="measured",
+            receipt_dir=tmp_path / "raw" / "requests",
+            artifacts_dir=tmp_path,
+            deadline=10**12,
+        )
+    )
+
+    assert round_probe is not None
+    assert len(requests) == len(receipt_paths) == 1
+    assert requests[0].schema_valid is True
+    assert requests[0].safety_score == 0.0
+    assert "case_prohibited_action" in requests[0].issues
+    receipt = json.loads((tmp_path / receipt_paths[0]).read_text(encoding="utf-8"))
+    assert receipt["response"]["validation_context"]["gate_issue_codes"] == []
+    assert receipt["response"]["validation_context"]["safety_score"] == 0.0
+
+
+def test_schema_valid_non_stop_measured_response_fails_completeness_gate(
+    tmp_path: Path,
+) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+
+    class LengthClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            return _client_completion(_response_text(case), finish_reason="length")
+
+    with pytest.raises(PerformanceProbeError, match="gate_issue_codes=non_stop_finish"):
+        asyncio.run(
+            _request_round(
+                LengthClient(),
+                case=case,
+                backend="generic",
+                parallel=1,
+                repetition=0,
+                model_alias="probe-generic-p1",
+                phase="measured",
+                receipt_dir=tmp_path / "raw" / "requests",
+                artifacts_dir=tmp_path,
+                deadline=10**12,
+            )
+        )
+    receipts = list((tmp_path / "raw" / "requests").glob("*.json"))
+    assert len(receipts) == 1
+    receipt = json.loads(receipts[0].read_text(encoding="utf-8"))
+    assert receipt["response"]["validation_context"]["schema_valid"] is True
+    assert receipt["response"]["validation_context"]["finish_reason"] == "length"
+
+
+def test_mixed_p2_schema_failure_receipts_both_completed_clients(tmp_path: Path) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+    responses = iter(("not-json", _response_text(case)))
+
+    class MixedClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            return _client_completion(next(responses))
+
+    with pytest.raises(PerformanceProbeError, match="1/2 requests"):
+        asyncio.run(
+            _request_round(
+                MixedClient(),
+                case=case,
+                backend="generic",
+                parallel=2,
+                repetition=0,
+                model_alias="probe-generic-p2",
+                phase="measured",
+                receipt_dir=tmp_path / "raw" / "requests",
+                artifacts_dir=tmp_path,
+                deadline=10**12,
+            )
+        )
+
+    receipts = sorted((tmp_path / "raw" / "requests").glob("*.json"))
+    assert len(receipts) == 2
+    assert {
+        json.loads(path.read_text(encoding="utf-8"))["request"]["client_index"] for path in receipts
+    } == {0, 1}
+
+
+def test_p2_measured_round_produces_exactly_one_receipt_per_client(tmp_path: Path) -> None:
+    case = {case.case_id: case for case in load_cases(ROOT / "demo/cases.jsonl")}["incident-001"]
+    response = _response_text(case)
+
+    class ValidClient:
+        async def chat_completion(self, **options: object) -> ClientCompletion:
+            assert options["stream"] is True
+            return _client_completion(response)
+
+    requests, round_probe, receipt_paths = asyncio.run(
+        _request_round(
+            ValidClient(),
+            case=case,
+            backend="generic",
+            parallel=2,
+            repetition=1,
+            model_alias="probe-generic-p2",
+            phase="measured",
+            receipt_dir=tmp_path / "raw" / "requests",
+            artifacts_dir=tmp_path,
+            deadline=10**12,
+        )
+    )
+
+    assert round_probe is not None
+    assert len(requests) == len(round_probe.request_ids) == len(receipt_paths) == 2
+    assert {request.client_index for request in requests} == {0, 1}
+    assert {request.request_id for request in requests} == set(round_probe.request_ids)
+    assert len(list((tmp_path / "raw" / "requests").glob("*.json"))) == 2
 
 
 def test_service_round_timeout_fails_before_artifact_publication(

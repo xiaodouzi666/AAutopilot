@@ -241,7 +241,8 @@ class OpenAIClient:
         usage: Mapping[str, Any] = {}
         response_id = ""
         response_model = str(payload.get("model", ""))
-        finish_reason = "stop"
+        finish_reason: str | None = None
+        saw_done = False
         try:
             async with self._client.stream(
                 "POST",
@@ -264,8 +265,11 @@ class OpenAIClient:
                     if not line.startswith("data:"):
                         continue
                     data = line[5:].strip()
-                    if not data or data == "[DONE]":
+                    if not data:
                         continue
+                    if data == "[DONE]":
+                        saw_done = True
+                        break
                     try:
                         chunk = json.loads(data)
                     except json.JSONDecodeError as exc:
@@ -294,6 +298,9 @@ class OpenAIClient:
                         content_parts.append(content)
         except httpx.HTTPError as exc:
             raise OpenAIClientError(f"upstream stream failed: {type(exc).__name__}") from exc
+
+        if not saw_done:
+            raise OpenAIClientError("upstream stream ended without an explicit [DONE] terminator")
 
         ended = time.monotonic_ns()
         text = "".join(content_parts)

@@ -11,7 +11,7 @@ import pytest
 from a64pilot.agent.schema import triage_openai_response_format
 from a64pilot.api.app import FIXTURE_MODEL_ID, UpstreamResponder, create_app
 from a64pilot.api.openai_types import CompletionResult
-from a64pilot.runtime.openai_client import OpenAIClient
+from a64pilot.runtime.openai_client import OpenAIClient, OpenAIClientError
 
 VALID_TRIAGE = {
     "summary": "The synthetic volume is full.",
@@ -469,6 +469,62 @@ async def test_runtime_stream_explicitly_requests_and_captures_usage() -> None:
         "total_tokens": 9,
     }
     assert completion.generation_tokens_per_second is not None
+    assert completion.payload["choices"][0]["finish_reason"] == "stop"
+
+
+@pytest.mark.asyncio
+async def test_runtime_stream_rejects_clean_eof_without_done_terminator() -> None:
+    private_body = "private-truncated-response-must-not-leak"
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        event = {
+            "id": "truncated",
+            "model": "fixture",
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {"content": private_body},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+        body = f"data: {json.dumps(event)}\n\n"
+        return httpx.Response(200, text=body, headers={"content-type": "text/event-stream"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        client = OpenAIClient("http://fixture", client=http_client)
+        with pytest.raises(OpenAIClientError, match=r"explicit \[DONE\] terminator") as captured:
+            await client.chat_completion(
+                messages=[{"role": "user", "content": "synthetic incident"}],
+                model="fixture",
+                stream=True,
+            )
+
+    assert private_body not in str(captured.value)
+
+
+@pytest.mark.asyncio
+async def test_runtime_stream_does_not_invent_finish_reason_before_done() -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        body = (
+            'data: {"id":"no-finish","model":"fixture","choices":'
+            '[{"index":0,"delta":{"content":"ok"}}]}\n\n'
+            "data: [DONE]\n\n"
+        )
+        return httpx.Response(200, text=body, headers={"content-type": "text/event-stream"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        client = OpenAIClient("http://fixture", client=http_client)
+        completion = await client.chat_completion(
+            messages=[{"role": "user", "content": "synthetic incident"}],
+            model="fixture",
+            stream=True,
+        )
+
+    assert completion.text == "ok"
+    assert completion.payload["choices"][0]["finish_reason"] is None
 
 
 @pytest.mark.asyncio

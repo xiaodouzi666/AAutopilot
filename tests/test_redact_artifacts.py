@@ -127,6 +127,31 @@ def test_artifact_check_uses_runtime_path_scope(tmp_path: Path) -> None:
     assert findings == [{"path": str(ordinary_report), "categories": ["ip_address"]}]
 
 
+def test_write_mode_preserves_crlf_while_redacting(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.csv"
+    evidence.write_bytes(b"field,value\r\npeer,10.42.0.7\r\n")
+
+    findings, scanned = REDACTOR["process_in_place"]([evidence], write=True)
+
+    assert scanned == 1
+    assert findings == [{"path": str(evidence), "categories": ["ip_address"]}]
+    assert evidence.read_bytes() == b"field,value\r\npeer,<redacted-ip>\r\n"
+
+
+def test_sanitized_copy_preserves_crlf_while_redacting(tmp_path: Path) -> None:
+    source = tmp_path / "artifacts"
+    source.mkdir()
+    evidence = source / "evidence.csv"
+    evidence.write_bytes(b"field,value\r\npeer,10.42.0.7\r\n")
+    destination = tmp_path / "artifacts-public"
+
+    findings, scanned = REDACTOR["sanitized_copy"](source, destination)
+
+    assert scanned == 1
+    assert findings == [{"path": evidence.name, "categories": ["ip_address"]}]
+    assert (destination / evidence.name).read_bytes() == (b"field,value\r\npeer,<redacted-ip>\r\n")
+
+
 def test_isolated_real_ip_in_runtime_evidence_is_still_redacted(tmp_path: Path) -> None:
     for address, level in (("10.42.100.200", "W"), ("8.18.100.200", "E")):
         runtime_log = tmp_path / "runtime" / f"{address}.stderr.log"

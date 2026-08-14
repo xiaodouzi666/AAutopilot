@@ -83,10 +83,14 @@ Semantic replay status: **{{ performance_probes.semantic_replay_verified }}**; c
 measurement fingerprint `{{ performance_probes.semantic_sha256 }}`. Samples: {{
 performance_probes.micro_cells }} micro cells / {{ performance_probes.micro_underlying_measurements
 }} underlying pp/tg measurements, {{ performance_probes.service_rounds }} service rounds / {{
-performance_probes.service_requests }} measured requests. Recorded failures: {{
+performance_probes.service_requests }} measured requests. Protocol failures: {{
 performance_probes.failed_micro_cells }} micro cells and {{
 performance_probes.failed_service_rounds }} service rounds; any failure prevents publication of a
-complete probe artifact.
+complete probe artifact. The {{ performance_probes.service_requests }} measured service responses
+include **{{ performance_probes.measured_service_safety_pass_count }} safety passes and {{
+performance_probes.measured_service_safety_failure_count }} recorded safety failures**. These
+calibration-case safety/quality outcomes are retained without filtering and support no held-out
+safety or quality claim.
 
 {% if probe_provenance is defined and probe_provenance %}
 ### Build and model provenance
@@ -114,15 +118,17 @@ llama.cpp source: `{{ probe_provenance.source_url }}` at commit
 
 ### Fresh-start p1/p2 service probes
 
-| Backend | p | Startup ms | Rounds / requests | Prompt / completion tokens | req/s mean ± sd | generated tok/s mean ± sd | Per-request gen tok/s mean ± sd | TTFT p50/p95 ms | E2E p50/p95 ms | Idle / peak RSS MiB | Context total/per slot |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-{% for row in performance_probes.service %}| {{ row.backend }} | {{ row.parallel }} | {{ "%.2f"|format(row.startup_ms) }} | {{ row.rounds }} / {{ row.requests }} | {{ row.prompt_tokens_total }} / {{ row.completion_tokens_total }} | {{ "%.3f"|format(row.requests_per_second_mean) }} ± {{ "%.3f"|format(row.requests_per_second_stddev) }} | {{ "%.2f"|format(row.generated_tokens_per_second_mean) }} ± {{ "%.2f"|format(row.generated_tokens_per_second_stddev) }} | {{ "%.2f"|format(row.request_generation_tok_s_mean) }} ± {{ "%.2f"|format(row.request_generation_tok_s_stddev) }} | {{ "%.2f"|format(row.ttft_p50_ms) }} / {{ "%.2f"|format(row.ttft_p95_ms) }} | {{ "%.2f"|format(row.e2e_p50_ms) }} / {{ "%.2f"|format(row.e2e_p95_ms) }} | {{ "%.1f"|format(row.idle_rss_mb) }} / {{ "%.1f"|format(row.peak_rss_mb) }} | {{ row.context_total }} / {{ row.context_per_slot }} |
+| Backend | p | Startup ms | Rounds / requests | Safety pass / fail | Quality mean / min | Prompt / completion tokens | req/s mean ± sd | generated tok/s mean ± sd | Per-request gen tok/s mean ± sd | TTFT p50/p95 ms | E2E p50/p95 ms | Idle / peak RSS MiB | Context total/per slot |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+{% for row in performance_probes.service %}| {{ row.backend }} | {{ row.parallel }} | {{ "%.2f"|format(row.startup_ms) }} | {{ row.rounds }} / {{ row.requests }} | {{ row.safety_pass_count }} / {{ row.safety_failure_count }} | {{ "%.2f"|format(row.quality_score_mean) }} / {{ "%.2f"|format(row.quality_score_min) }} | {{ row.prompt_tokens_total }} / {{ row.completion_tokens_total }} | {{ "%.3f"|format(row.requests_per_second_mean) }} ± {{ "%.3f"|format(row.requests_per_second_stddev) }} | {{ "%.2f"|format(row.generated_tokens_per_second_mean) }} ± {{ "%.2f"|format(row.generated_tokens_per_second_stddev) }} | {{ "%.2f"|format(row.request_generation_tok_s_mean) }} ± {{ "%.2f"|format(row.request_generation_tok_s_stddev) }} | {{ "%.2f"|format(row.ttft_p50_ms) }} / {{ "%.2f"|format(row.ttft_p95_ms) }} | {{ "%.2f"|format(row.e2e_p50_ms) }} / {{ "%.2f"|format(row.e2e_p95_ms) }} | {{ "%.1f"|format(row.idle_rss_mb) }} / {{ "%.1f"|format(row.peak_rss_mb) }} | {{ row.context_total }} / {{ row.context_per_slot }} |
 {% endfor %}
 
 For p2, total server context is doubled so the effective 2048-token capacity per request is the
 same as p1. Completed requests/s and aggregate generated tokens/s use each measured round's wall
 clock; per-request generation rate is replayed from completion-token usage and monotonic decode
-time. Any missing usage, first token, schema/safety pass, raw hash, or matrix cell fails closed.
+time. Missing usage, first token, schema-valid output, complete `stop` finish, raw hash, or matrix
+cell fails closed. A schema-valid safety failure is recorded, not dropped or retried, so probe
+performance statistics are not conditioned on a favorable safety result.
 
 Exact reproduction commands:
 
