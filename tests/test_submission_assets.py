@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import struct
+import zlib
 from pathlib import Path
 from types import ModuleType
 
@@ -23,6 +25,30 @@ def _load_script(name: str) -> ModuleType:
 
 assets = _load_script("generate-submission-assets.py")
 placeholders = _load_script("check-final-placeholders.py")
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+VALID_IDAT = zlib.compress(b"\x00\x00\x00\x00")  # filter byte + one RGB pixel
+
+
+def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    crc = zlib.crc32(chunk_type)
+    crc = zlib.crc32(data, crc) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
+
+
+def _minimal_png(*, idat: bytes | None = VALID_IDAT, include_iend: bool = True) -> bytes:
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    payload = PNG_SIGNATURE + _png_chunk(b"IHDR", ihdr)
+    if idat is not None:
+        payload += _png_chunk(b"IDAT", idat)
+    if include_iend:
+        payload += _png_chunk(b"IEND", b"")
+    return payload
+
+
+def _write_png(path: Path, payload: bytes) -> Path:
+    path.write_bytes(payload)
+    return path
 
 
 def test_quality_summary_is_recomputed_from_measured_sources() -> None:
@@ -69,6 +95,56 @@ def test_committed_submission_assets_pass_integrity_verification(
         )
     monkeypatch.setattr(assets.shutil, "which", lambda _name: None)
     assets.verify_assets(ROOT)
+
+
+def test_stdlib_png_parser_accepts_complete_chunk_stream(tmp_path: Path) -> None:
+    path = _write_png(tmp_path / "valid.png", _minimal_png())
+
+    assert assets._png_dimensions(path) == (1, 1)
+
+
+def test_stdlib_png_parser_rejects_truncated_chunk(tmp_path: Path) -> None:
+    path = _write_png(tmp_path / "truncated.png", _minimal_png()[:-1])
+
+    with pytest.raises(assets.SubmissionAssetError, match="truncated PNG chunk"):
+        assets._png_dimensions(path)
+
+
+def test_stdlib_png_parser_rejects_crc_corruption(tmp_path: Path) -> None:
+    payload = bytearray(_minimal_png())
+    payload[payload.index(b"IDAT") + 4] ^= 0x01
+    path = _write_png(tmp_path / "bad-crc.png", bytes(payload))
+
+    with pytest.raises(assets.SubmissionAssetError, match="CRC mismatch.*IDAT"):
+        assets._png_dimensions(path)
+
+
+@pytest.mark.parametrize("idat", [None, b""], ids=["missing", "empty"])
+def test_stdlib_png_parser_requires_nonempty_idat(
+    tmp_path: Path,
+    idat: bytes | None,
+) -> None:
+    path = _write_png(tmp_path / "no-data.png", _minimal_png(idat=idat))
+
+    with pytest.raises(assets.SubmissionAssetError, match="no non-empty PNG IDAT"):
+        assets._png_dimensions(path)
+
+
+def test_stdlib_png_parser_requires_terminal_iend(tmp_path: Path) -> None:
+    path = _write_png(
+        tmp_path / "no-iend.png",
+        _minimal_png(include_iend=False),
+    )
+
+    with pytest.raises(assets.SubmissionAssetError, match="no terminal PNG IEND"):
+        assets._png_dimensions(path)
+
+
+def test_stdlib_png_parser_rejects_trailing_data(tmp_path: Path) -> None:
+    path = _write_png(tmp_path / "trailing.png", _minimal_png() + b"garbage")
+
+    with pytest.raises(assets.SubmissionAssetError, match="trailing data after PNG IEND"):
+        assets._png_dimensions(path)
 
 
 def test_current_publishable_surfaces_pass_placeholder_policy() -> None:

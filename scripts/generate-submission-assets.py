@@ -17,6 +17,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import zlib
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -618,17 +619,98 @@ def _probe_image(path: Path, *, ffprobe: str) -> tuple[int, int]:
 
 
 def _png_dimensions(path: Path) -> tuple[int, int]:
-    """Read the mandatory PNG signature and IHDR without requiring media tools."""
+    """Parse a complete PNG chunk stream without requiring media tools."""
 
     try:
-        header = path.read_bytes()[:24]
+        payload = path.read_bytes()
     except OSError as exc:
         raise SubmissionAssetError(f"cannot read PNG evidence {path}: {exc}") from exc
-    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
-        raise SubmissionAssetError(f"{path} is not a canonical PNG with an IHDR header")
-    width, height = struct.unpack(">II", header[16:24])
-    if width < 1 or height < 1:
-        raise SubmissionAssetError(f"{path} has invalid PNG dimensions")
+    if payload[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SubmissionAssetError(f"{path} has an invalid PNG signature")
+
+    offset = 8
+    chunk_index = 0
+    saw_ihdr = False
+    saw_nonempty_idat = False
+    saw_iend = False
+    width = height = 0
+    valid_bit_depths = {
+        0: {1, 2, 4, 8, 16},
+        2: {8, 16},
+        3: {1, 2, 4, 8},
+        4: {8, 16},
+        6: {8, 16},
+    }
+    known_critical_chunks = {b"IHDR", b"PLTE", b"IDAT", b"IEND"}
+
+    while offset < len(payload):
+        if len(payload) - offset < 12:
+            raise SubmissionAssetError(f"{path} has a truncated PNG chunk header")
+        chunk_length = struct.unpack(">I", payload[offset : offset + 4])[0]
+        chunk_type = payload[offset + 4 : offset + 8]
+        if chunk_length > 0x7FFFFFFF:
+            raise SubmissionAssetError(f"{path} has an oversized PNG chunk")
+        if not all(
+            ord("A") <= value <= ord("Z") or ord("a") <= value <= ord("z") for value in chunk_type
+        ):
+            raise SubmissionAssetError(f"{path} has an invalid PNG chunk type")
+        if not ord("A") <= chunk_type[2] <= ord("Z"):
+            raise SubmissionAssetError(f"{path} has an invalid reserved PNG chunk bit")
+        if chunk_type[0] & 0x20 == 0 and chunk_type not in known_critical_chunks:
+            name = chunk_type.decode("ascii")
+            raise SubmissionAssetError(f"{path} has unknown critical PNG chunk {name}")
+
+        data_start = offset + 8
+        data_end = data_start + chunk_length
+        chunk_end = data_end + 4
+        if chunk_end > len(payload):
+            name = chunk_type.decode("ascii")
+            raise SubmissionAssetError(f"{path} has truncated PNG chunk {name}")
+        chunk_data = payload[data_start:data_end]
+        stored_crc = struct.unpack(">I", payload[data_end:chunk_end])[0]
+        calculated_crc = zlib.crc32(chunk_type)
+        calculated_crc = zlib.crc32(chunk_data, calculated_crc) & 0xFFFFFFFF
+        if stored_crc != calculated_crc:
+            name = chunk_type.decode("ascii")
+            raise SubmissionAssetError(f"{path} has a CRC mismatch in PNG chunk {name}")
+
+        if chunk_index == 0 and chunk_type != b"IHDR":
+            raise SubmissionAssetError(f"{path} does not begin with the PNG IHDR chunk")
+        if chunk_type == b"IHDR":
+            if saw_ihdr or chunk_index != 0 or chunk_length != 13:
+                raise SubmissionAssetError(f"{path} has an invalid PNG IHDR chunk")
+            width, height, bit_depth, color_type, compression, filtering, interlace = struct.unpack(
+                ">IIBBBBB", chunk_data
+            )
+            if not (0 < width <= 0x7FFFFFFF and 0 < height <= 0x7FFFFFFF):
+                raise SubmissionAssetError(f"{path} has invalid PNG dimensions")
+            if bit_depth not in valid_bit_depths.get(color_type, set()):
+                raise SubmissionAssetError(f"{path} has an invalid PNG color type or bit depth")
+            if compression != 0 or filtering != 0 or interlace not in {0, 1}:
+                raise SubmissionAssetError(f"{path} has unsupported PNG IHDR fields")
+            saw_ihdr = True
+        elif not saw_ihdr:
+            raise SubmissionAssetError(f"{path} has a PNG chunk before IHDR")
+        elif chunk_type == b"IDAT" and chunk_length > 0:
+            saw_nonempty_idat = True
+        elif chunk_type == b"IEND":
+            if chunk_length != 0:
+                raise SubmissionAssetError(f"{path} has a non-empty PNG IEND chunk")
+            saw_iend = True
+            if chunk_end != len(payload):
+                raise SubmissionAssetError(f"{path} has trailing data after PNG IEND")
+
+        offset = chunk_end
+        chunk_index += 1
+        if saw_iend:
+            break
+
+    if not saw_ihdr:
+        raise SubmissionAssetError(f"{path} has no PNG IHDR chunk")
+    if not saw_nonempty_idat:
+        raise SubmissionAssetError(f"{path} has no non-empty PNG IDAT chunk")
+    if not saw_iend:
+        raise SubmissionAssetError(f"{path} has no terminal PNG IEND chunk")
     return width, height
 
 
