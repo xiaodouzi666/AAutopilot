@@ -157,6 +157,9 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          # Natural-voice public derivatives are produced after CI from the attested video.
+          # Never let a manifest retained from an earlier checkout enter a new evidence subject.
+          rm -f artifacts/submission/a64pilot-demo-natural-voice.manifest.json
           if [[ "${{ job.status }}" != "success" ]]; then
             # A failed run must never republish the checkout's prior-run index.
             rm -f artifacts/evidence-index.json
