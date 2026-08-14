@@ -4,8 +4,10 @@ import json
 import platform
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
+from typer.main import get_command
 from typer.testing import CliRunner
 
 import a64pilot.benchmark.cascade as cascade_module
@@ -14,6 +16,28 @@ from a64pilot.schemas import SYSTEM_INFO_SCHEMA_VERSION, SystemInfo
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _registered_option_names(*command_path: str) -> set[str]:
+    """Return Click's registered spellings without depending on Rich rendering."""
+
+    command: Any = get_command(app)
+    for name in command_path:
+        commands = getattr(command, "commands", None)
+        if not isinstance(commands, dict):
+            raise AssertionError(f"{command_path!r} does not resolve to a command group")
+        child = commands.get(name)
+        if child is None:
+            raise AssertionError(f"command {name!r} is not registered in {command_path!r}")
+        command = child
+    return {
+        spelling
+        for parameter in getattr(command, "params", ())
+        for spelling in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
+    }
 
 
 def test_version_option_exits_successfully() -> None:
@@ -45,14 +69,14 @@ def test_bounded_protocol_probe_command_is_exposed() -> None:
     result = runner.invoke(app, ["benchmark", "probes", "--help"])
     assert result.exit_code == 0
     assert "p1/p2 concurrency" in result.stdout
-    assert "--max-minutes" in result.stdout
+    assert "--max-minutes" in _registered_option_names("benchmark", "probes")
 
 
 def test_probe_verifier_exposes_private_and_public_roots() -> None:
     result = runner.invoke(app, ["verify-probes", "--help"])
     assert result.exit_code == 0
-    assert "--artifacts-dir" in result.stdout
-    assert "--manifest-only" in result.stdout
+    option_names = _registered_option_names("verify-probes")
+    assert {"--artifacts-dir", "--manifest-only"} <= option_names
 
 
 @pytest.mark.parametrize(

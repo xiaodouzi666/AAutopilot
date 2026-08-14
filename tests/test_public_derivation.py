@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 import yaml
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from a64pilot.benchmark.store import ArtifactStore
@@ -310,8 +311,20 @@ def test_verifier_does_not_collect_host_or_rehash_models_and_builds(
 def test_cli_and_workflow_put_derivation_before_public_semantic_replays() -> None:
     result = CliRunner().invoke(app, ["verify-public-derivation", "--help"])
     assert result.exit_code == 0
-    assert "--artifacts-dir" in result.stdout
-    assert "--private-artifacts" in result.stdout
+    root_command = get_command(app)
+    commands = getattr(root_command, "commands", None)
+    assert isinstance(commands, dict)
+    command = commands.get("verify-public-derivation")
+    assert command is not None
+    option_names = {
+        spelling
+        for parameter in getattr(command, "params", ())
+        for spelling in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
+    }
+    assert {"--artifacts-dir", "--private-artifacts"} <= option_names
 
     workflow = (ROOT / ".github/workflows/arm64-evidence.yml").read_text(encoding="utf-8")
     derivation = workflow.index("Verify sanitized A0-A4 evidence derivation")

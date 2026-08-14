@@ -228,6 +228,7 @@ def test_linux_doctor_declares_every_masked_required_fact(
     cpuinfo = tmp_path / "cpuinfo"
     cpuinfo.write_text("processor: 0\nCPU implementer: 0x41\nCPU part: 0xd0c\n")
     monkeypatch.setattr(detect_module, "_run_text", lambda _command: None)
+    monkeypatch.setattr(detect_module, "_linux_memory_bytes", lambda: None)
     monkeypatch.setattr(detect_module, "detect_cpu_features", lambda **_kwargs: {})
     monkeypatch.setattr(topology_module, "_command_text", lambda _command: None)
 

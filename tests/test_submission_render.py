@@ -45,7 +45,15 @@ def _project(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_finalized_checklist_replays_public_receipt(tmp_path: Path) -> None:
+def test_finalized_checklist_replays_public_receipt(tmp_path: Path, monkeypatch) -> None:
+    # This test exercises a finalized local/publication replay, not an executing
+    # GitHub workflow.  GitHub's ambient CI variables deliberately make
+    # render_submission ignore an older indexed video and Devpost receipt, so
+    # remove them explicitly instead of making the production provenance gate
+    # depend on where pytest happens to run.
+    for name in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_SHA", "GITHUB_REPOSITORY"):
+        monkeypatch.delenv(name, raising=False)
+
     outputs = render_submission(project_root=_project(tmp_path), allow_pending=True)
     checklist = outputs["checklist"].read_text(encoding="utf-8")
 
