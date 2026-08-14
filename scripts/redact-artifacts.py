@@ -44,6 +44,7 @@ TOKEN_PATTERNS = (
     ),
 )
 IPV4_PATTERN = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
+LLAMA_ELAPSED_PREFIX = re.compile(r"\d{1,3}\.\d{2}\.\d{3}\.\d{3}")
 SSH_PATTERN = re.compile(r"(?<![\w.-])(?:ssh|scp)\s+(?:-[^\s]+\s+)*[^\s@]+@[^\s]+")
 
 
@@ -61,8 +62,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def sensitive_ipv4_replacement(match: re.Match[str]) -> str:
+def sensitive_ipv4_replacement(
+    match: re.Match[str], *, allow_llama_elapsed_prefix: bool = False
+) -> str:
     value = match.group(0)
+    # llama.cpp verbosity-5 logs prefix each line with an elapsed counter such as
+    # ``0.10.168.200 D``.  Some counters are also syntactically valid IPv4 addresses, but they
+    # are timing data rather than network identifiers.  Exempt only that exact line-start shape;
+    # a real address elsewhere on the same line is still redacted.
+    at_line_start = match.start() == 0 or match.string[match.start() - 1] == "\n"
+    suffix = match.string[match.end() : match.end() + 3]
+    if (
+        allow_llama_elapsed_prefix
+        and at_line_start
+        and LLAMA_ELAPSED_PREFIX.fullmatch(value)
+        and re.fullmatch(r" [TDIWE] ", suffix)
+    ):
+        return value
     try:
         address = ipaddress.ip_address(value)
     except ValueError:
@@ -86,7 +102,13 @@ def private_literals() -> tuple[tuple[str, str, str], ...]:
     return tuple(values)
 
 
-def redact_text(text: str) -> tuple[str, set[str]]:
+def is_llama_runtime_evidence(path: Path) -> bool:
+    return (path.name.endswith(".stderr.log") and path.parent.name == "runtime") or (
+        path.name == "runtime-proof.txt" and path.parent.parent.name == "raw"
+    )
+
+
+def redact_text(text: str, *, allow_llama_elapsed_prefix: bool = False) -> tuple[str, set[str]]:
     categories: set[str] = set()
     output = text
     for literal, replacement, category in private_literals():
@@ -101,7 +123,13 @@ def redact_text(text: str) -> tuple[str, set[str]]:
     output, count = SSH_PATTERN.subn("<redacted-ssh-command>", output)
     if count:
         categories.add("ssh_command")
-    revised = IPV4_PATTERN.sub(sensitive_ipv4_replacement, output)
+    revised = IPV4_PATTERN.sub(
+        lambda match: sensitive_ipv4_replacement(
+            match,
+            allow_llama_elapsed_prefix=allow_llama_elapsed_prefix,
+        ),
+        output,
+    )
     if revised != output:
         categories.add("ip_address")
         output = revised
@@ -142,7 +170,10 @@ def process_in_place(paths: list[Path], *, write: bool) -> tuple[list[dict[str, 
             continue
         scanned += 1
         original = path.read_text(encoding="utf-8", errors="replace")
-        revised, categories = redact_text(original)
+        revised, categories = redact_text(
+            original,
+            allow_llama_elapsed_prefix=is_llama_runtime_evidence(path),
+        )
         if revised == original:
             continue
         findings.append({"path": str(path), "categories": sorted(categories)})
@@ -166,7 +197,10 @@ def sanitized_copy(source: Path, destination: Path) -> tuple[list[dict[str, obje
         if is_text(source_path):
             scanned += 1
             original = source_path.read_text(encoding="utf-8", errors="replace")
-            revised, categories = redact_text(original)
+            revised, categories = redact_text(
+                original,
+                allow_llama_elapsed_prefix=is_llama_runtime_evidence(source_path),
+            )
             target.write_text(revised, encoding="utf-8")
             if revised != original:
                 findings.append({"path": str(relative), "categories": sorted(categories)})
