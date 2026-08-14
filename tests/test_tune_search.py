@@ -62,6 +62,8 @@ def record(
     candidate_id: str,
     case_id: str,
     *,
+    run_id: str | None = None,
+    repetition: int = 0,
     split: str = "calibration",
     latency: float = 100.0,
     quality: float = 100.0,
@@ -69,10 +71,11 @@ def record(
     schema_valid: bool = True,
 ) -> BenchmarkRecord:
     return BenchmarkRecord(
-        run_id=f"{candidate_id}-{case_id}",
+        run_id=run_id or f"{candidate_id}-{case_id}",
         candidate_id=candidate_id,
         stage="tuned",
         case_id=case_id,
+        repetition=repetition,
         split=split,
         backend="kleidiai",
         model_role="strong",
@@ -192,6 +195,32 @@ def test_candidate_result_requires_formal_test_rows() -> None:
     assert result.config["quantization"] == "Q4_0"
     with pytest.raises(ValueError, match="formal-test"):
         candidate_result_from_records([record("calibration", "incident-001", split="calibration")])
+
+
+def test_candidate_result_canonicalizes_shuffled_formal_rows_before_run_ids() -> None:
+    case_1_rep_0 = record(
+        "finalist",
+        "incident-001",
+        run_id="f" * 32,
+        split="test",
+    )
+    case_2_rep_0 = record(
+        "finalist",
+        "incident-002",
+        run_id="0" * 32,
+        split="test",
+    )
+    case_1_rep_1 = record(
+        "finalist",
+        "incident-001",
+        run_id="1" * 32,
+        repetition=1,
+        split="test",
+    )
+
+    result = candidate_result_from_records([case_1_rep_1, case_2_rep_0, case_1_rep_0])
+
+    assert result.source_run_ids == ["f" * 32, "0" * 32, "1" * 32]
 
 
 def test_benchmark_tune_command_is_exposed() -> None:

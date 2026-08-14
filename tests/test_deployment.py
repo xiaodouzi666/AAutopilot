@@ -19,14 +19,16 @@ def record(
     candidate_id: str,
     stage: str,
     *,
+    case_id: str = "incident-001",
+    repetition: int = 0,
     threads: int = 8,
 ) -> BenchmarkRecord:
     return BenchmarkRecord(
         run_id=run_id,
         candidate_id=candidate_id,
         stage=stage,
-        case_id="incident-001",
-        repetition=0,
+        case_id=case_id,
+        repetition=repetition,
         split="test",
         backend="generic" if stage == "baseline" else "kleidiai",
         model_role="strong",
@@ -166,6 +168,51 @@ def test_profile_source_rows_and_settings_must_match_evidence(tmp_path: Path) ->
     config["threads"] = 4
     write_profile(path, payload)
     with pytest.raises(DeploymentProfileError, match="threads disagrees"):
+        load_measured_profile(path, project_root=tmp_path)
+
+
+def test_profile_replays_canonical_rows_from_run_id_ordered_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline_rows = [
+        record("e" * 32, "a1-generic-q4-0", "baseline", case_id="incident-001"),
+        record("2" * 32, "a1-generic-q4-0", "baseline", case_id="incident-002"),
+        record(
+            "3" * 32,
+            "a1-generic-q4-0",
+            "baseline",
+            case_id="incident-001",
+            repetition=1,
+        ),
+    ]
+    candidate_rows = [
+        record("f" * 32, "a2-kleidiai-q4-0", "kleidiai", case_id="incident-001"),
+        record("0" * 32, "a2-kleidiai-q4-0", "kleidiai", case_id="incident-002"),
+        record(
+            "1" * 32,
+            "a2-kleidiai-q4-0",
+            "kleidiai",
+            case_id="incident-001",
+            repetition=1,
+        ),
+    ]
+    store_ordered_rows = sorted([*baseline_rows, *candidate_rows], key=lambda row: row.run_id)
+    monkeypatch.setattr(
+        "a64pilot.report.integrity.validate_evidence_bundle",
+        lambda *_args, **_kwargs: (store_ordered_rows, []),
+    )
+    payload = measured_profile()
+    payload["source_run_ids"] = ["f" * 32, "0" * 32, "1" * 32]
+    path = tmp_path / "profile.yaml"
+    write_profile(path, payload)
+
+    profile = load_measured_profile(path, project_root=tmp_path)
+
+    assert profile.source_run_ids == ("f" * 32, "0" * 32, "1" * 32)
+
+    payload["source_run_ids"] = ["0" * 32, "1" * 32, "f" * 32]
+    write_profile(path, payload)
+    with pytest.raises(DeploymentProfileError, match="do not exactly match"):
         load_measured_profile(path, project_root=tmp_path)
 
 

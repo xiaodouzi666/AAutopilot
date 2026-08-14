@@ -110,7 +110,11 @@ def _bind_profile_to_evidence(
 ) -> None:
     """Replay selection and require every served setting to come from formal rows."""
 
-    from a64pilot.optimize.search import candidate_result_from_records, select_frozen_deployment
+    from a64pilot.optimize.search import (
+        candidate_result_from_records,
+        canonical_formal_row_key,
+        select_frozen_deployment,
+    )
     from a64pilot.report.integrity import validate_evidence_bundle
     from a64pilot.settings import load_settings
 
@@ -120,7 +124,10 @@ def _bind_profile_to_evidence(
     formal_rows = [
         row for row in records if row.evidence_kind == "measured" and row.split == "test"
     ]
-    selected_rows = [row for row in formal_rows if row.candidate_id == deployment.profile_id]
+    selected_rows = sorted(
+        (row for row in formal_rows if row.candidate_id == deployment.profile_id),
+        key=canonical_formal_row_key,
+    )
     if not selected_rows:
         raise DeploymentProfileError("profile has no formal measured test rows")
     if [row.run_id for row in selected_rows] != list(deployment.source_run_ids):

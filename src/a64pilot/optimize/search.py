@@ -209,10 +209,16 @@ def rank_calibration_candidates(
     return gated, [item.candidate_id for item in ranked]
 
 
+def canonical_formal_row_key(row: BenchmarkRecord) -> tuple[int, str, str]:
+    """Order formal candidate rows independently of evidence-store directory order."""
+
+    return row.repetition, row.case_id, row.run_id
+
+
 def candidate_result_from_records(records: Sequence[BenchmarkRecord]) -> CandidateResult:
     """Convert one homogeneous formal-test record group to the quality-gate type."""
 
-    rows = sorted(records, key=lambda row: (row.repetition, row.case_id, row.run_id))
+    rows = sorted(records, key=canonical_formal_row_key)
     if not rows:
         raise ValueError("cannot summarize an empty candidate record group")
     first = rows[0]
@@ -346,6 +352,7 @@ __all__ = [
     "FrozenSelection",
     "SearchEvaluation",
     "candidate_result_from_records",
+    "canonical_formal_row_key",
     "rank_calibration_candidates",
     "select_frozen_deployment",
     "validate_candidate_records",
