@@ -1,115 +1,608 @@
 {
-  "build": null,
-  "claims": [],
-  "evidence_status": "measurement-pending",
-  "fixture_count": 0,
-  "generated_at": "2026-08-13T23:00:57.375499+00:00",
+  "build": {
+    "generated_at": "2026-08-14T03:36:40.842535Z",
+    "schema_version": "1.0.0",
+    "source_url": "https://github.com/ggml-org/llama.cpp.git",
+    "variants": [
+      {
+        "backend": "generic",
+        "binaries": {
+          "llama-bench": "build/llama-generic/bin/llama-bench",
+          "llama-cli": "build/llama-generic/bin/llama-cli",
+          "llama-server": "build/llama-generic/bin/llama-server"
+        },
+        "binary_sha256": {
+          "llama-bench": "8b8415ce52a6223871d35ca1b22e1d4daef51ca151196e53643a507f188031fc",
+          "llama-cli": "d6158ae18d4ee194492709a918e969f7ce3a38c47bacffc825ec3acfdb703432",
+          "llama-server": "c93b33ca4acfe946ff323e58ee0e2febd773fd1b3b86c5f0abe72aa85bcefaab"
+        },
+        "build_type": "Release",
+        "cmake_flags": [
+          "-DBUILD_SHARED_LIBS=OFF",
+          "-DCMAKE_BUILD_TYPE=Release",
+          "-DGGML_ACCELERATE=OFF",
+          "-DGGML_BLAS=OFF",
+          "-DGGML_CANN=OFF",
+          "-DGGML_CPU_KLEIDIAI=OFF",
+          "-DGGML_CUDA=OFF",
+          "-DGGML_ET=OFF",
+          "-DGGML_HEXAGON=OFF",
+          "-DGGML_HIP=OFF",
+          "-DGGML_METAL=OFF",
+          "-DGGML_MUSA=OFF",
+          "-DGGML_OPENCL=OFF",
+          "-DGGML_OPENVINO=OFF",
+          "-DGGML_RPC=OFF",
+          "-DGGML_SYCL=OFF",
+          "-DGGML_VIRTGPU=OFF",
+          "-DGGML_VIRTGPU_BACKEND=OFF",
+          "-DGGML_VULKAN=OFF",
+          "-DGGML_WEBGPU=OFF",
+          "-DGGML_ZDNN=OFF",
+          "-DGGML_ZENDNN=OFF",
+          "-DLLAMA_BUILD_EXAMPLES=ON",
+          "-DLLAMA_BUILD_SERVER=ON",
+          "-DLLAMA_BUILD_TESTS=OFF"
+        ],
+        "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "cpu_only_configured": true,
+        "kleidiai_configured": false,
+        "runtime_marker_verified": false,
+        "source_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d"
+      },
+      {
+        "backend": "kleidiai",
+        "binaries": {
+          "llama-bench": "build/llama-kleidiai/bin/llama-bench",
+          "llama-cli": "build/llama-kleidiai/bin/llama-cli",
+          "llama-server": "build/llama-kleidiai/bin/llama-server"
+        },
+        "binary_sha256": {
+          "llama-bench": "df532f240e966ea1dae2536ba5360daa8852a413095b3305e4158109a14af26a",
+          "llama-cli": "e5dacb22478be1f91ac1ee4f0051395a216df0063a670d6f2b713ff595b48a10",
+          "llama-server": "5020e911a40ca0fd0bb742638d47d8610b6797846b6dd02c49d7ae118e22e8eb"
+        },
+        "build_type": "Release",
+        "cmake_flags": [
+          "-DBUILD_SHARED_LIBS=OFF",
+          "-DCMAKE_BUILD_TYPE=Release",
+          "-DGGML_ACCELERATE=OFF",
+          "-DGGML_BLAS=OFF",
+          "-DGGML_CANN=OFF",
+          "-DGGML_CPU_KLEIDIAI=ON",
+          "-DGGML_CUDA=OFF",
+          "-DGGML_ET=OFF",
+          "-DGGML_HEXAGON=OFF",
+          "-DGGML_HIP=OFF",
+          "-DGGML_METAL=OFF",
+          "-DGGML_MUSA=OFF",
+          "-DGGML_OPENCL=OFF",
+          "-DGGML_OPENVINO=OFF",
+          "-DGGML_RPC=OFF",
+          "-DGGML_SYCL=OFF",
+          "-DGGML_VIRTGPU=OFF",
+          "-DGGML_VIRTGPU_BACKEND=OFF",
+          "-DGGML_VULKAN=OFF",
+          "-DGGML_WEBGPU=OFF",
+          "-DGGML_ZDNN=OFF",
+          "-DGGML_ZENDNN=OFF",
+          "-DLLAMA_BUILD_EXAMPLES=ON",
+          "-DLLAMA_BUILD_SERVER=ON",
+          "-DLLAMA_BUILD_TESTS=OFF"
+        ],
+        "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "cpu_only_configured": true,
+        "kleidiai_configured": true,
+        "runtime_marker_verified": true,
+        "source_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d"
+      }
+    ]
+  },
+  "cases_sha256": "8c73129b9b7991d28e38ad8a7d5a9d5d015649bc8c059d98535c5cb5ae13ac4f",
+  "claims": [
+    {
+      "baseline_candidate": "a1-generic-q4-0",
+      "claim_id": "fair_q4_0_mean_ttft_reduction",
+      "confidence_interval": [
+        0.6515969938677603,
+        2.955143181713959
+      ],
+      "demonstrated": true,
+      "formula": "(generic_q4_0_mean_ttft_ms - kleidiai_q4_0_mean_ttft_ms) / generic_q4_0_mean_ttft_ms * 100",
+      "metric": "Q4_0 mean time-to-first-token reduction",
+      "optimized_candidate": "a2-kleidiai-q4-0",
+      "source_rows": [
+        "b169922e39024a9bafda9693ecbff34d",
+        "271ae569b28a448182781aaadaa9573a",
+        "e9011d2e37924b089a884c281e986cba",
+        "e2cff27c10884b188391fdb7904e7c26",
+        "ea56f1ebf83743dc9f4bce5c8b986f62",
+        "e4f8529d7229459aae25a80423c62cd7",
+        "a4b41ea5ece347b5b0fecf59693df62c",
+        "4c327fc2fa084699a2f97818801843f9",
+        "70552bae0f2d4b1bb7c3b113f03093cb",
+        "8626221607c44b3b948b536dbb3e7567",
+        "18ee4be46ca34c01b258ee654513c315",
+        "74f486eb991140278cd2cd2cadecc1f1",
+        "3376e4a67aec436f929e73c028017ea8",
+        "af05d81ddb9f47ad981ba47bf90b6a18",
+        "68f07d061049483197d9e97cffec0e14",
+        "44c0c1569a2546e4b7fa8c8200833e1c",
+        "14de180e02ad4d978678281f580ae238",
+        "e152cf1baf594079a91ea597135793bd",
+        "63ccc27351de47ebbd5b8619a53f56fd",
+        "c5878408351341df9f79d5f3c16dd316",
+        "a73df0c48d6f42ed9df0eb0f4fde8e89",
+        "1c963cb659544238ad6dcc24f5acd429",
+        "90c05ffbc4a54188aace213625993c6b",
+        "2a054e9b2c3e41efbab2caff32741c90",
+        "6bc50e06c03f4cbb88b0e8fd67cc09d3",
+        "f57b986061c441b18d9c109a3816b1ef",
+        "7450c30c681247439fd68dc85136b2af",
+        "91cc2903f40f412bb1b29ba850e4371c",
+        "f5fe35dde4e24517a2850006473e55c2",
+        "9ba0378b495442a98de541a5d194ddaa",
+        "f07ceb0294b04fa89d86a029c6b868ca",
+        "726d7aa0638e4ed18da86e30b182e39e",
+        "297c757e9eaa4026baad0c45dd8e79f1",
+        "139c8cf34b27410d9317c9279c8ec46d",
+        "63ddc3fcabc640d19bb90ee068e180a1",
+        "793081ad28de4c87ac99abf8b35d9e90",
+        "02e33fd7b687440b86523d7e4cb2b854",
+        "d7b66ce0b7f4470bbe7f8a914b41d927",
+        "25cf70e7bc9f4465a39bdf5584147f75",
+        "aae2325c5fe24755a4eb9b765936f1ae"
+      ],
+      "unit": "%",
+      "value": 1.7935946161895577
+    },
+    {
+      "baseline_candidate": "a1-generic-q4-0",
+      "claim_id": "fair_q4_0_p95_latency_reduction",
+      "confidence_interval": [
+        -18.448447438570422,
+        49.453028827488474
+      ],
+      "demonstrated": false,
+      "formula": "(generic_q4_0_p95_ms - kleidiai_q4_0_p95_ms) / generic_q4_0_p95_ms * 100",
+      "metric": "Q4_0 p95 end-to-end latency reduction",
+      "optimized_candidate": "a2-kleidiai-q4-0",
+      "source_rows": [
+        "b169922e39024a9bafda9693ecbff34d",
+        "271ae569b28a448182781aaadaa9573a",
+        "e9011d2e37924b089a884c281e986cba",
+        "e2cff27c10884b188391fdb7904e7c26",
+        "ea56f1ebf83743dc9f4bce5c8b986f62",
+        "e4f8529d7229459aae25a80423c62cd7",
+        "a4b41ea5ece347b5b0fecf59693df62c",
+        "4c327fc2fa084699a2f97818801843f9",
+        "70552bae0f2d4b1bb7c3b113f03093cb",
+        "8626221607c44b3b948b536dbb3e7567",
+        "18ee4be46ca34c01b258ee654513c315",
+        "74f486eb991140278cd2cd2cadecc1f1",
+        "3376e4a67aec436f929e73c028017ea8",
+        "af05d81ddb9f47ad981ba47bf90b6a18",
+        "68f07d061049483197d9e97cffec0e14",
+        "44c0c1569a2546e4b7fa8c8200833e1c",
+        "14de180e02ad4d978678281f580ae238",
+        "e152cf1baf594079a91ea597135793bd",
+        "63ccc27351de47ebbd5b8619a53f56fd",
+        "c5878408351341df9f79d5f3c16dd316",
+        "a73df0c48d6f42ed9df0eb0f4fde8e89",
+        "1c963cb659544238ad6dcc24f5acd429",
+        "90c05ffbc4a54188aace213625993c6b",
+        "2a054e9b2c3e41efbab2caff32741c90",
+        "6bc50e06c03f4cbb88b0e8fd67cc09d3",
+        "f57b986061c441b18d9c109a3816b1ef",
+        "7450c30c681247439fd68dc85136b2af",
+        "91cc2903f40f412bb1b29ba850e4371c",
+        "f5fe35dde4e24517a2850006473e55c2",
+        "9ba0378b495442a98de541a5d194ddaa",
+        "f07ceb0294b04fa89d86a029c6b868ca",
+        "726d7aa0638e4ed18da86e30b182e39e",
+        "297c757e9eaa4026baad0c45dd8e79f1",
+        "139c8cf34b27410d9317c9279c8ec46d",
+        "63ddc3fcabc640d19bb90ee068e180a1",
+        "793081ad28de4c87ac99abf8b35d9e90",
+        "02e33fd7b687440b86523d7e4cb2b854",
+        "d7b66ce0b7f4470bbe7f8a914b41d927",
+        "25cf70e7bc9f4465a39bdf5584147f75",
+        "aae2325c5fe24755a4eb9b765936f1ae"
+      ],
+      "unit": "%",
+      "value": 2.768626551439474
+    },
+    {
+      "baseline_candidate": "a1-generic-q4-0",
+      "claim_id": "fair_q4_0_request_throughput_increase",
+      "confidence_interval": [
+        -3.2257349590330993,
+        10.491224440280039
+      ],
+      "demonstrated": false,
+      "formula": "(kleidiai_q4_0_median_rps - generic_q4_0_median_rps) / generic_q4_0_median_rps * 100",
+      "metric": "Q4_0 median per-request throughput increase",
+      "optimized_candidate": "a2-kleidiai-q4-0",
+      "source_rows": [
+        "b169922e39024a9bafda9693ecbff34d",
+        "271ae569b28a448182781aaadaa9573a",
+        "e9011d2e37924b089a884c281e986cba",
+        "e2cff27c10884b188391fdb7904e7c26",
+        "ea56f1ebf83743dc9f4bce5c8b986f62",
+        "e4f8529d7229459aae25a80423c62cd7",
+        "a4b41ea5ece347b5b0fecf59693df62c",
+        "4c327fc2fa084699a2f97818801843f9",
+        "70552bae0f2d4b1bb7c3b113f03093cb",
+        "8626221607c44b3b948b536dbb3e7567",
+        "18ee4be46ca34c01b258ee654513c315",
+        "74f486eb991140278cd2cd2cadecc1f1",
+        "3376e4a67aec436f929e73c028017ea8",
+        "af05d81ddb9f47ad981ba47bf90b6a18",
+        "68f07d061049483197d9e97cffec0e14",
+        "44c0c1569a2546e4b7fa8c8200833e1c",
+        "14de180e02ad4d978678281f580ae238",
+        "e152cf1baf594079a91ea597135793bd",
+        "63ccc27351de47ebbd5b8619a53f56fd",
+        "c5878408351341df9f79d5f3c16dd316",
+        "a73df0c48d6f42ed9df0eb0f4fde8e89",
+        "1c963cb659544238ad6dcc24f5acd429",
+        "90c05ffbc4a54188aace213625993c6b",
+        "2a054e9b2c3e41efbab2caff32741c90",
+        "6bc50e06c03f4cbb88b0e8fd67cc09d3",
+        "f57b986061c441b18d9c109a3816b1ef",
+        "7450c30c681247439fd68dc85136b2af",
+        "91cc2903f40f412bb1b29ba850e4371c",
+        "f5fe35dde4e24517a2850006473e55c2",
+        "9ba0378b495442a98de541a5d194ddaa",
+        "f07ceb0294b04fa89d86a029c6b868ca",
+        "726d7aa0638e4ed18da86e30b182e39e",
+        "297c757e9eaa4026baad0c45dd8e79f1",
+        "139c8cf34b27410d9317c9279c8ec46d",
+        "63ddc3fcabc640d19bb90ee068e180a1",
+        "793081ad28de4c87ac99abf8b35d9e90",
+        "02e33fd7b687440b86523d7e4cb2b854",
+        "d7b66ce0b7f4470bbe7f8a914b41d927",
+        "25cf70e7bc9f4465a39bdf5584147f75",
+        "aae2325c5fe24755a4eb9b765936f1ae"
+      ],
+      "unit": "%",
+      "value": 2.8571096383420174
+    }
+  ],
+  "evidence_status": "measured",
+  "fixture_count": 26,
+  "generated_at": "2026-08-14T04:01:45.230902+00:00",
   "limitations": [
     "Results apply only to the recorded target, model files, runtime commit, and workload.",
     "The synthetic incident suite is not a general LLM capability benchmark.",
     "No energy or cloud-cost claim is made without a credible counter or supplied price.",
     "Fixture responses are excluded from every performance claim."
   ],
-  "measurement_count": 0,
-  "models": null,
-  "summaries": [],
+  "measurement_count": 90,
+  "models": {
+    "generated_at": "2026-08-14T03:39:27.153852Z",
+    "models": [
+      {
+        "bytes": 428730208,
+        "filename": "qwen2.5-0.5b-instruct-q4_0.gguf",
+        "kleidiai_compatible": true,
+        "license": "Apache-2.0",
+        "local_path": "qwen2.5-0.5b-instruct-q4_0.gguf",
+        "quantization": "Q4_0",
+        "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+        "reviewed_kleidiai_fallbacks": [],
+        "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+        "role": "weak",
+        "sha256": "7671c0c304e6ce5a7fc577bcb12aba01e2c155cc2efd29b2213c95b18edaf6ed",
+        "tensor_inventory_sha256": "1a7569410a657c555f86436d1c00104d72953be10d4861598877f516ada30b05",
+        "tensor_type_histogram": {
+          "F32": 121,
+          "Q4_0": 169,
+          "Q8_0": 1
+        }
+      },
+      {
+        "bytes": 1066227232,
+        "filename": "qwen2.5-1.5b-instruct-q4_0.gguf",
+        "kleidiai_compatible": true,
+        "license": "Apache-2.0",
+        "local_path": "qwen2.5-1.5b-instruct-q4_0.gguf",
+        "quantization": "Q4_0",
+        "repository": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+        "reviewed_kleidiai_fallbacks": [
+          {
+            "dimensions": [
+              1536,
+              151936
+            ],
+            "name": "output.weight",
+            "type": "Q6_K"
+          }
+        ],
+        "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+        "role": "strong",
+        "sha256": "dcd819ff094852c38faba6873d8ff0c9d51eadb2844539e52042ae5d647bbfdb",
+        "tensor_inventory_sha256": "af0f2dacb88a77fd2ac469924b72ca1cee6ef03993a2df7e916d8ad4ea38ae76",
+        "tensor_type_histogram": {
+          "F32": 141,
+          "Q4_0": 197,
+          "Q6_K": 1
+        }
+      },
+      {
+        "bytes": 1894532128,
+        "filename": "qwen2.5-1.5b-instruct-q8_0.gguf",
+        "kleidiai_compatible": true,
+        "license": "Apache-2.0",
+        "local_path": "qwen2.5-1.5b-instruct-q8_0.gguf",
+        "quantization": "Q8_0",
+        "repository": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+        "reviewed_kleidiai_fallbacks": [],
+        "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+        "role": "strong",
+        "sha256": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8",
+        "tensor_inventory_sha256": "d8c4f7c924053e056d95e291c4817c051ebb948a15a0f9e8aeae4a147815e758",
+        "tensor_type_histogram": {
+          "F32": 141,
+          "Q8_0": 198
+        }
+      }
+    ],
+    "schema_version": "1.0.0"
+  },
+  "primary_claim_id": "fair_q4_0_mean_ttft_reduction",
+  "split_schema_version": "2.0",
+  "split_sha256": "92e312535402fa92903c453f0c84c5799bd0dbc5449e60023d3e6259b138949d",
+  "summaries": [
+    {
+      "backend": "generic",
+      "candidate_id": "a0-generic-q8",
+      "p50_latency_ms": 7280.2285875,
+      "p95_latency_ms": 10671.2752068,
+      "peak_rss_mb": 3396.71484375,
+      "quality_score": 67.25,
+      "safety_score": 80.0,
+      "sample_count": 10,
+      "source_run_ids": [
+        "064961441f3843a189c800c143560685",
+        "0928e2b4a2ef4f4f83f9d814da55d418",
+        "148a29d4561a4c308df778c458f545ef",
+        "1919227543e844b4897faa97b736376a",
+        "1b43f9c7a7f34fcbb5c588304c52c928",
+        "3d9dc1f081e146daa28fa954dd628402",
+        "4e7c2e465bfb4db193150d502e3f969d",
+        "75a0b3aaa8b64e3c981979ab62795d6c",
+        "e788f6eacb184cf4b690a2082505735b",
+        "f9e877d1ded94a81ae4fe2a8f0dad3ff"
+      ],
+      "stage": "reference"
+    },
+    {
+      "backend": "generic",
+      "candidate_id": "a1-generic-q4-0",
+      "p50_latency_ms": 6111.735780999999,
+      "p95_latency_ms": 7353.417137250005,
+      "peak_rss_mb": 1940.41796875,
+      "quality_score": 72.975,
+      "safety_score": 100.0,
+      "sample_count": 20,
+      "source_run_ids": [
+        "14de180e02ad4d978678281f580ae238",
+        "18ee4be46ca34c01b258ee654513c315",
+        "271ae569b28a448182781aaadaa9573a",
+        "3376e4a67aec436f929e73c028017ea8",
+        "44c0c1569a2546e4b7fa8c8200833e1c",
+        "4c327fc2fa084699a2f97818801843f9",
+        "63ccc27351de47ebbd5b8619a53f56fd",
+        "68f07d061049483197d9e97cffec0e14",
+        "70552bae0f2d4b1bb7c3b113f03093cb",
+        "74f486eb991140278cd2cd2cadecc1f1",
+        "8626221607c44b3b948b536dbb3e7567",
+        "a4b41ea5ece347b5b0fecf59693df62c",
+        "af05d81ddb9f47ad981ba47bf90b6a18",
+        "b169922e39024a9bafda9693ecbff34d",
+        "c5878408351341df9f79d5f3c16dd316",
+        "e152cf1baf594079a91ea597135793bd",
+        "e2cff27c10884b188391fdb7904e7c26",
+        "e4f8529d7229459aae25a80423c62cd7",
+        "e9011d2e37924b089a884c281e986cba",
+        "ea56f1ebf83743dc9f4bce5c8b986f62"
+      ],
+      "stage": "baseline"
+    },
+    {
+      "backend": "kleidiai",
+      "candidate_id": "a2-kleidiai-q4-0",
+      "p50_latency_ms": 5941.62203,
+      "p95_latency_ms": 7149.828477950001,
+      "peak_rss_mb": 1941.1328125,
+      "quality_score": 73.875,
+      "safety_score": 100.0,
+      "sample_count": 20,
+      "source_run_ids": [
+        "02e33fd7b687440b86523d7e4cb2b854",
+        "139c8cf34b27410d9317c9279c8ec46d",
+        "1c963cb659544238ad6dcc24f5acd429",
+        "25cf70e7bc9f4465a39bdf5584147f75",
+        "297c757e9eaa4026baad0c45dd8e79f1",
+        "2a054e9b2c3e41efbab2caff32741c90",
+        "63ddc3fcabc640d19bb90ee068e180a1",
+        "6bc50e06c03f4cbb88b0e8fd67cc09d3",
+        "726d7aa0638e4ed18da86e30b182e39e",
+        "7450c30c681247439fd68dc85136b2af",
+        "793081ad28de4c87ac99abf8b35d9e90",
+        "90c05ffbc4a54188aace213625993c6b",
+        "91cc2903f40f412bb1b29ba850e4371c",
+        "9ba0378b495442a98de541a5d194ddaa",
+        "a73df0c48d6f42ed9df0eb0f4fde8e89",
+        "aae2325c5fe24755a4eb9b765936f1ae",
+        "d7b66ce0b7f4470bbe7f8a914b41d927",
+        "f07ceb0294b04fa89d86a029c6b868ca",
+        "f57b986061c441b18d9c109a3816b1ef",
+        "f5fe35dde4e24517a2850006473e55c2"
+      ],
+      "stage": "kleidiai"
+    },
+    {
+      "backend": "kleidiai",
+      "candidate_id": "kleidiai-q4-0-t4-b128-u128-p1-c2048",
+      "p50_latency_ms": 5919.986671500001,
+      "p95_latency_ms": 7049.283116050001,
+      "peak_rss_mb": 1954.02734375,
+      "quality_score": 73.875,
+      "safety_score": 100.0,
+      "sample_count": 20,
+      "source_run_ids": [
+        "0bfbf22ae64949fbae309ed1df9cb388",
+        "0f352a0230984fdd9b01de18dc2f3f45",
+        "1e17c3c0f71f48819e472716c6386c94",
+        "209b1426269f4710bd83242d5d33d29f",
+        "26d46c52d08e441e93ffb5b00204d559",
+        "559d5b29f28642a0926e7c2ce0d70ccd",
+        "64258cb213c34779b1c2fcc6a0a79092",
+        "64b0dabb94bf4397984d4487ff8adcee",
+        "70e59aa84a81423d93199e4ad627863a",
+        "7448149eeb604469aebc6b5bd4487041",
+        "835ba54be92648fe839234565c25aa3c",
+        "8ed1f0f52af74f7db3088f82dc27a675",
+        "9b587c2b78694a9e94b5c5da1baab865",
+        "9d1eb1b5c1ca4344ab7c186db95209a3",
+        "db71dfc732f8448883fb0a0a3f9622f7",
+        "e26167a96fa044918efdc21dd18455bc",
+        "e3a798d747e64ee9afe7d4e8a4444586",
+        "e9d2998d8e71418a82773ad03ab79830",
+        "f618456665a14ac08004b6cdc4fce1a3",
+        "f917247ebda644d1b465e2582de6dbf2"
+      ],
+      "stage": "tuned"
+    },
+    {
+      "backend": "kleidiai",
+      "candidate_id": "kleidiai-q4-0-t4-b128-u64-p1-c2048",
+      "p50_latency_ms": 5967.488868,
+      "p95_latency_ms": 7006.58995545,
+      "peak_rss_mb": 1942.09375,
+      "quality_score": 73.875,
+      "safety_score": 100.0,
+      "sample_count": 20,
+      "source_run_ids": [
+        "002be1334a7946e99c282be3b8d045f2",
+        "0dfa878369d14d24992b321e9e6dba2b",
+        "154abc70f2b34a7ca9756ceced659f4c",
+        "2a2e5e21956040e5b9e96cc5d7bd0851",
+        "312982d35e2f44f9a7237878ee9d46e6",
+        "3a41701fce884c9faa3088ec1992e4de",
+        "4be2e691f6894725a7ee9fb7e3c86166",
+        "63853f2ee95d4918841f2eb799748048",
+        "6930951704fb4a6abeb629beb4945451",
+        "6a1d881f8fa54203a1df812c4e827ef7",
+        "7452f685ae3a4d3d87a19c14f8b84f7e",
+        "7c76717f890f4825b7e9cc6c6d238b62",
+        "8ec4b99181a9473cb733a326b70df511",
+        "a57e8fb24c0b4b3c84a3068161c09a1c",
+        "bab1fe31ef5147d4b840690fb792db38",
+        "cf3e11e9ca1a45c095dbb2d18d5a497a",
+        "d20ed8804db040d9809f8803ae651d4d",
+        "d4b1da043bfa4871a933cc25d346ac5f",
+        "d6e99674500d48719de54904482df897",
+        "e894cd904aff41298bfeecc04bdb62a3"
+      ],
+      "stage": "tuned"
+    }
+  ],
   "system": {
     "affinity_candidates": {
       "all_allowed": [
         0,
         1,
         2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13
+        3
       ]
     },
     "architecture": "aarch64",
-    "architecture_raw": "arm64",
+    "architecture_raw": "aarch64",
     "arm64": true,
-    "collected_at": "2026-08-13T22:05:41.205203Z",
-    "cpu_model": "Apple M4 Pro",
+    "collected_at": "2026-08-14T03:29:12.703503Z",
+    "cpu_model": "unknown",
     "features": {
       "bf16": {
         "evidence": [
-          "sysctl: hw.optional.arm.FEAT_BF16=1"
+          "/proc/cpuinfo: bf16",
+          "/proc/cpuinfo: svebf16",
+          "lscpu: bf16",
+          "lscpu: svebf16"
         ],
         "supported": true
       },
       "dotprod": {
         "evidence": [
-          "sysctl: hw.optional.arm.FEAT_DotProd=1"
+          "/proc/cpuinfo: asimddp",
+          "lscpu: asimddp"
         ],
         "supported": true
       },
       "fp16": {
         "evidence": [
-          "sysctl: hw.optional.arm.FEAT_FP16=1",
-          "sysctl: hw.optional.armv8_2_fhm=1"
+          "/proc/cpuinfo: asimdhp",
+          "/proc/cpuinfo: fphp",
+          "lscpu: asimdhp",
+          "lscpu: fphp"
         ],
         "supported": true
       },
       "i8mm": {
         "evidence": [
-          "sysctl: hw.optional.arm.FEAT_I8MM=1"
+          "/proc/cpuinfo: i8mm",
+          "lscpu: i8mm"
         ],
         "supported": true
       },
       "sme": {
-        "evidence": [
-          "sysctl: hw.optional.arm.FEAT_SME=1"
-        ],
-        "supported": true
+        "evidence": [],
+        "supported": false
       },
       "sme2": {
+        "evidence": [],
+        "supported": false
+      },
+      "sve": {
         "evidence": [
-          "sysctl: hw.optional.arm.FEAT_SME2=1"
+          "/proc/cpuinfo: sve",
+          "lscpu: sve"
         ],
         "supported": true
       },
-      "sve": {
-        "evidence": [],
-        "supported": false
-      },
       "sve2": {
-        "evidence": [],
-        "supported": false
+        "evidence": [
+          "/proc/cpuinfo: sve2",
+          "lscpu: sve2"
+        ],
+        "supported": true
       }
     },
-    "filesystem_free_bytes": 14374121472,
-    "kernel": "25.5.0",
-    "limitations": [
-      "macOS does not expose Linux-style CPU affinity",
-      "final service benchmark mode requires Linux on Arm64"
-    ],
-    "logical_cores": 14,
-    "memory_bytes": 25769803776,
-    "operating_system": "Darwin",
-    "physical_cores": 14,
+    "filesystem_free_bytes": 116219830272,
+    "kernel": "6.17.0-1022-azure",
+    "limitations": [],
+    "logical_cores": 4,
+    "memory_bytes": 16722046976,
+    "operating_system": "Linux",
+    "physical_cores": 4,
     "public_redacted": true,
-    "python_version": "3.11.12",
-    "real_benchmark_eligible": false,
+    "python_version": "3.11.13",
+    "real_benchmark_eligible": true,
     "schema_version": "1.0.0",
     "sources": [
       "platform",
       "uname",
-      "sysctl hw.logicalcpu/hw.physicalcpu",
-      "sysctl hw.memsize",
-      "sysctl machdep.cpu.brand_string",
+      "Linux sysfs CPU topology",
+      "/proc/meminfo",
+      "/proc/cpuinfo",
       "filesystem stat"
     ],
     "tool_versions": {
-      "cmake": null,
-      "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
-      "python": "3.11.12 (main, Apr  9 2025, 03:49:53) [Clang 20.1.0 ]"
+      "cmake": "cmake version 3.31.6",
+      "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+      "python": "3.11.13 (main, Aug 14 2025, 16:24:47) [Clang 20.1.4 ]"
     },
     "topology": {
       "affinity_candidates": [
@@ -118,17 +611,7 @@
             0,
             1,
             2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13
+            3
           ],
           "evidence": [
             "OS allowed CPU set"
@@ -140,139 +623,47 @@
         0,
         1,
         2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13
+        3
       ],
       "cores": [
         {
-          "capacity": null,
-          "core_id": null,
+          "capacity": 1024,
+          "core_id": 1,
           "cpu_id": 0,
           "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
+          "numa_node": 0,
+          "package_id": 36
         },
         {
-          "capacity": null,
-          "core_id": null,
+          "capacity": 1024,
+          "core_id": 2,
           "cpu_id": 1,
           "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
+          "numa_node": 0,
+          "package_id": 36
         },
         {
-          "capacity": null,
-          "core_id": null,
+          "capacity": 1024,
+          "core_id": 3,
           "cpu_id": 2,
           "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
+          "numa_node": 0,
+          "package_id": 36
         },
         {
-          "capacity": null,
-          "core_id": null,
+          "capacity": 1024,
+          "core_id": 4,
           "cpu_id": 3,
           "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 4,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 5,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 6,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 7,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 8,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 9,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 10,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 11,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 12,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
-        },
-        {
-          "capacity": null,
-          "core_id": null,
-          "cpu_id": 13,
-          "max_frequency_khz": null,
-          "numa_node": null,
-          "package_id": null
+          "numa_node": 0,
+          "package_id": 36
         }
       ],
-      "limitations": [
-        "macOS does not expose Linux-style CPU affinity"
-      ],
-      "logical_cpus": 14,
-      "physical_cores": 14,
+      "limitations": [],
+      "logical_cpus": 4,
+      "physical_cores": 4,
       "sources": [
-        "sysctl hw.logicalcpu/hw.physicalcpu"
+        "Linux sysfs CPU topology"
       ]
     }
   }

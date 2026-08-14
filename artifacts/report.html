@@ -20,7 +20,7 @@
     h2 { font-size:1.55rem; letter-spacing:-.02em; margin:0 0 18px; }
     p { color:var(--muted); }
     .status { border:1px solid var(--line); background:rgba(11,23,40,.84); padding:22px; border-radius:18px; }
-    .status strong { color:var(--amber); display:block; font-size:1.2rem; }
+    .status strong { color:var(--mint); display:block; font-size:1.2rem; }
     .badges { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
     .badge { padding:8px 11px; border:1px solid var(--line); border-radius:999px; color:#dbeafe; background:#07111f; font-size:.82rem; }
     .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:18px; margin:18px 0; }
@@ -54,25 +54,28 @@
       <div class="badges"><span class="badge">GPU: NONE</span><span class="badge">QUALITY-GATED</span><span class="badge">RAW EVIDENCE</span><span class="badge">OPEN SOURCE</span></div>
     </div>
     <div class="status">
-      <strong>ARM64 MEASUREMENT PENDING</strong>
-      <p>No performance number is published until the fair generic/KleidiAI run finishes on Arm64 Linux. 0 fixture rows remain excluded.</p>
+      <strong>MEASURED EVIDENCE</strong>
+      <p>90 measured request rows passed provenance checks.</p>
+      <p>Cases <code>8c73129b9b79…</code><br>Split v2.0 <code>92e312535402…</code></p>
     </div>
   </header>
 
   <section class="grid">
-      <article class="card"><div class="metric">0<small>fabricated benchmark claims</small></div><p>The report fails closed when target evidence is absent.</p></article>
+      <article class="card"><div class="metric">1.79%<small>PRIMARY — Q4_0 mean time-to-first-token reduction</small></div><p>Interval excludes zero on the positive side. The preregistered final gate passes.</p></article>
+      <article class="card"><div class="metric">2.77%<small>SECONDARY — Q4_0 p95 end-to-end latency reduction</small></div><p>Interval crosses zero. Disclosed transparently; never unlocks final publication.</p></article>
+      <article class="card"><div class="metric">2.86%<small>SECONDARY — Q4_0 median per-request throughput increase</small></div><p>Interval crosses zero. Disclosed transparently; never unlocks final publication.</p></article>
     <article class="card"><div class="metric">100%<small>required safety floor</small></div><p>The submitted strong-only proxy validates schema, read-only tool policy, safety, and consistency; invalid output fails closed with HTTP 502.</p></article>
-    <article class="card"><div class="metric">40 / 20<small>calibration / held-out cases</small></div><p>Tuning decisions freeze before final labels are evaluated. A4 routing remains a future experiment unless its gate passes.</p></article>
+    <article class="card"><div class="metric">40 / 20<small>calibration / v2 final-holdout cases</small></div><p>Split v2 was frozen from 36 never-executed candidates using only category and case ID. A4 routing remains a future experiment unless its gate passes.</p></article>
   </section>
 
   <section id="candidates"><h2>Measured candidates</h2>
     <table><thead><tr><th>Candidate</th><th>Stage</th><th>Backend</th><th>n</th><th>p50 ms</th><th>p95 ms</th><th>Quality</th><th>Safety</th><th>Peak RSS</th></tr></thead>
-      <tbody><tr><td colspan="9">Awaiting same-machine Arm64 Linux A1/A2 measurements.</td></tr></tbody>
+      <tbody><tr><td>a0-generic-q8</td><td>reference</td><td>generic</td><td>10</td><td>7280.23</td><td>10671.28</td><td>67.25</td><td>80.00</td><td>3396.7 MB</td></tr><tr><td>a1-generic-q4-0</td><td>baseline</td><td>generic</td><td>20</td><td>6111.74</td><td>7353.42</td><td>72.97</td><td>100.00</td><td>1940.4 MB</td></tr><tr><td>a2-kleidiai-q4-0</td><td>kleidiai</td><td>kleidiai</td><td>20</td><td>5941.62</td><td>7149.83</td><td>73.88</td><td>100.00</td><td>1941.1 MB</td></tr><tr><td>kleidiai-q4-0-t4-b128-u128-p1-c2048</td><td>tuned</td><td>kleidiai</td><td>20</td><td>5919.99</td><td>7049.28</td><td>73.88</td><td>100.00</td><td>1954.0 MB</td></tr><tr><td>kleidiai-q4-0-t4-b128-u64-p1-c2048</td><td>tuned</td><td>kleidiai</td><td>20</td><td>5967.49</td><td>7006.59</td><td>73.88</td><td>100.00</td><td>1942.1 MB</td></tr></tbody>
     </table>
   </section>
 
   <section id="figures" class="grid" style="margin-top:28px"><article class="card wide"><img class="figure" src="figures/ablation.png" alt="Ablation stages"></article><article class="card wide"><img class="figure" src="figures/pareto.png" alt="Quality latency Pareto candidates"></article></section>
-  <section id="evidence"><h2>Evidence contract</h2><p>The primary Arm claim compares the same Q4_0 model checksum, prompts, sampling, runtime settings, CPU affinity, and machine. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K <code>output.weight</code>; that fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. The primary KleidiAI Q4 marker is required and any additional or different fallback is rejected. The intended change is only the generic versus KleidiAI backend. Every claim cites raw run IDs and an explicit formula; fixture output can never support a claim.</p></section>
+  <section id="evidence"><h2>Evidence contract</h2><p>The primary Arm claim compares the same Q4_0 model checksum, prompts, sampling, runtime settings, CPU affinity, and machine. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K <code>output.weight</code>; that fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. The primary KleidiAI Q4 marker is required and any additional or different fallback is rejected. The intended change is only the generic versus KleidiAI backend. Every report claim retains its raw run IDs and explicit formula; fixture output can never support a claim.</p><p>Split v1's test cases were executed during failed run6 and used for error analysis, so they are retired from final evaluation. Before the next run, split v2 selected 20 cases from 36 never-executed candidates with a frozen stratified hash using only category and case ID. Only v2 is described as the unseen final holdout; <code>demo/split-freeze-v2.json</code> preserves the audit trail.</p><p>Mean TTFT reduction is the prospectively registered primary outcome. P95 end-to-end latency reduction and median per-request throughput increase are transparent secondary outcomes. All three use the same 20 paired cases and 40 formal A1/A2 source rows. Only a positive primary interval with a lower bound above zero unlocks final publication.</p><p>The repository carries sanitized formal rows and <code>claims.json</code>; the attested release bundle carries the full redacted raw capture and integrity receipts.</p></section>
   <section id="limitations"><h2>Limitations</h2><ul><li>Results apply only to the recorded target, model files, runtime commit, and workload.</li><li>The synthetic incident suite is not a general LLM capability benchmark.</li><li>No energy or cloud-cost claim is made without a credible counter or supplied price.</li><li>Fixture responses are excluded from every performance claim.</li></ul></section>
-  <footer>Generated 2026-08-13T23:00:57.375499+00:00 from local artifacts. This file loads no external network resources.</footer>
+  <footer>Generated 2026-08-14T04:01:45.230902+00:00 from local artifacts. This file loads no external network resources.</footer>
 </main></body></html>

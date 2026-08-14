@@ -29,10 +29,11 @@ OpenAI-compatible API  ←  selected profile  →  raw evidence + offline report
 The included workload is safe cloud incident triage over 60 original synthetic fixtures.
 Each case has an expected diagnosis, severity, read-only tool set, prohibited actions, and
 escalation behavior. Split v1's test cases were executed during failed run6 and used for error
-analysis, so they are retired from final evaluation. Before the next run, split v2 selected 20
-final-holdout cases from 36 never-executed candidates with a frozen category-stratified hash whose
-only inputs were category and case ID; the other 40 cases calibrate tuning. Only v2 is described
-as the unseen final holdout. The agent never executes model-generated shell commands.
+analysis, so they are retired from final evaluation. Before the successful final run, split v2
+selected 20 final-holdout cases from 36 never-executed candidates with a frozen
+category-stratified hash whose only inputs were category and case ID; the other 40 cases calibrate
+tuning. Only v2 is described as the unseen final holdout. The agent never executes model-generated
+shell commands.
 
 ## Why this is Arm-specific
 
@@ -54,6 +55,33 @@ prospectively registered primary outcome; p95 end-to-end latency and per-request
 are transparent secondary outcomes that cannot unlock final publication. Fixture/demo responses
 carry an explicit `fixture` label and cannot support a claim.
 
+## Verified Arm64 result
+
+The final evidence was produced by public GitHub Actions
+[run 31766912155](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155)
+at commit
+[`20f6c0e1e925350d94d04ebb50ede0e0591136b4`](https://github.com/xiaodouzi666/AAutopilot/commit/20f6c0e1e925350d94d04ebb50ede0e0591136b4)
+on the official `ubuntu-24.04-arm` runner. The fair A1/A2 comparison used 20 matched final-holdout
+cases (40 formal source rows):
+
+- **Primary:** mean Q4_0 TTFT reduction was **1.794%**, with a paired 95% bootstrap interval of
+  **0.652% to 2.955%**. The preregistered publication gate passed.
+- **Transparent secondary:** p95 end-to-end latency reduction was **2.769%**, with a paired 95%
+  interval of **-18.448% to 49.453%**. This outcome was not demonstrated.
+- **Transparent secondary:** median per-request throughput increase was **2.857%**, with a paired
+  95% interval of **-3.226% to 10.491%**. This outcome was not demonstrated.
+- A1 and A2 quality scores were **72.97** and **73.88**, respectively, and both achieved
+  **100% safety**.
+
+The complete redacted capture is in the
+[evidence release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155),
+whose evidence archive is covered by
+[GitHub artifact attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497).
+The [public demo video](https://youtu.be/RT0ORZ3iIpE) is a natural-voice, audio-only derivative:
+its visual stream and benchmark content are unchanged from the CI-rendered source, but the
+YouTube MP4 is not itself attested. The original CI-rendered video remains inside the attested
+evidence bundle and is the authoritative media source.
+
 ## Outputs
 
 After a measured run, `artifacts/` contains:
@@ -65,7 +93,7 @@ model-manifest.json           repositories, revisions, filenames, sizes, SHA-256
 raw/<run-id>/                 commands, requests, logs, RSS and integrity hashes
 benchmark-results.{json,csv}  validated measured rows
 ablation-results.csv          A0–A4 summary
-quality-results.json          calibration/test separation and gate result
+quality-*.json                 calibration/final-holdout results and gate inputs
 optimized-profile.yaml        selected measured deployment profile
 claims.json                   formulas, candidates, confidence intervals, source rows
 report.{html,md}              offline evidence dashboard
@@ -151,9 +179,12 @@ gh attestation verify aarch64-autopilot-evidence.tar.gz \
   -R xiaodouzi666/AAutopilot
 ```
 
-The GitHub Actions run and attestation URL are the authoritative execution provenance. The
-repository carries the sanitized formal rows, generated report, and claim index for convenient
-review; the attested release bundle carries the full redacted raw capture and integrity receipts.
+The exact [successful run](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155),
+[release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155),
+and [attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497) are the
+authoritative execution provenance. The repository carries the sanitized formal rows, generated
+report, and claim index for convenient review; the attested release bundle carries the full
+redacted raw capture and integrity receipts.
 
 ## Stable commands
 

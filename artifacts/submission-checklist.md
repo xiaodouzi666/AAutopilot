@@ -1,8 +1,8 @@
 # Submission Checklist
 
-Generated 2026-08-13T22:56:55.924162+00:00 for **AArch64 Autopilot: Self-Optimizing Agentic AI on Arm CPUs**.
+Generated 2026-08-14T04:02:26.722943+00:00 for **AArch64 Autopilot: Self-Optimizing Agentic AI on Arm CPUs**.
 
-- [ ] Same-machine Arm64 Linux evidence exists and produced validated claims.
+- [x] Same-machine Arm64 Linux evidence exists and produced validated claims.
 - [ ] Devpost project thumbnail uploaded.
 - [ ] Public repository opens when signed out: https://github.com/xiaodouzi666/AAutopilot.
 - [ ] GitHub recognizes the root Apache-2.0 license.
@@ -19,4 +19,4 @@ Generated 2026-08-13T22:56:55.924162+00:00 for **AArch64 Autopilot: Self-Optimiz
 - [ ] Public demo video is under three minutes and uses real values only.
 - [ ] Final Devpost submit action explicitly confirmed and live receipt verified before 15 August 2026 01:00 CEST.
 
-Evidence status: **measurement pending — not ready for final submit**.
+Evidence status: **measured**.

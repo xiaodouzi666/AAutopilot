@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-08-14T03:39:27.153852Z",
+  "models": [
+    {
+      "bytes": 428730208,
+      "filename": "qwen2.5-0.5b-instruct-q4_0.gguf",
+      "kleidiai_compatible": true,
+      "license": "Apache-2.0",
+      "local_path": "qwen2.5-0.5b-instruct-q4_0.gguf",
+      "quantization": "Q4_0",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+      "reviewed_kleidiai_fallbacks": [],
+      "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+      "role": "weak",
+      "sha256": "7671c0c304e6ce5a7fc577bcb12aba01e2c155cc2efd29b2213c95b18edaf6ed",
+      "tensor_inventory_sha256": "1a7569410a657c555f86436d1c00104d72953be10d4861598877f516ada30b05",
+      "tensor_type_histogram": {
+        "F32": 121,
+        "Q4_0": 169,
+        "Q8_0": 1
+      }
+    },
+    {
+      "bytes": 1066227232,
+      "filename": "qwen2.5-1.5b-instruct-q4_0.gguf",
+      "kleidiai_compatible": true,
+      "license": "Apache-2.0",
+      "local_path": "qwen2.5-1.5b-instruct-q4_0.gguf",
+      "quantization": "Q4_0",
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "reviewed_kleidiai_fallbacks": [
+        {
+          "dimensions": [
+            1536,
+            151936
+          ],
+          "name": "output.weight",
+          "type": "Q6_K"
+        }
+      ],
+      "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+      "role": "strong",
+      "sha256": "dcd819ff094852c38faba6873d8ff0c9d51eadb2844539e52042ae5d647bbfdb",
+      "tensor_inventory_sha256": "af0f2dacb88a77fd2ac469924b72ca1cee6ef03993a2df7e916d8ad4ea38ae76",
+      "tensor_type_histogram": {
+        "F32": 141,
+        "Q4_0": 197,
+        "Q6_K": 1
+      }
+    },
+    {
+      "bytes": 1894532128,
+      "filename": "qwen2.5-1.5b-instruct-q8_0.gguf",
+      "kleidiai_compatible": true,
+      "license": "Apache-2.0",
+      "local_path": "qwen2.5-1.5b-instruct-q8_0.gguf",
+      "quantization": "Q8_0",
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "reviewed_kleidiai_fallbacks": [],
+      "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+      "role": "strong",
+      "sha256": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8",
+      "tensor_inventory_sha256": "d8c4f7c924053e056d95e291c4817c051ebb948a15a0f9e8aeae4a147815e758",
+      "tensor_type_histogram": {
+        "F32": 141,
+        "Q8_0": 198
+      }
+    }
+  ],
+  "schema_version": "1.0.0"
+}

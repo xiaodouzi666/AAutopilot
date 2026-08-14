@@ -1,0 +1,99 @@
+{
+  "generated_at": "2026-08-14T03:36:40.842535Z",
+  "schema_version": "1.0.0",
+  "source_url": "https://github.com/ggml-org/llama.cpp.git",
+  "variants": [
+    {
+      "backend": "generic",
+      "binaries": {
+        "llama-bench": "build/llama-generic/bin/llama-bench",
+        "llama-cli": "build/llama-generic/bin/llama-cli",
+        "llama-server": "build/llama-generic/bin/llama-server"
+      },
+      "binary_sha256": {
+        "llama-bench": "8b8415ce52a6223871d35ca1b22e1d4daef51ca151196e53643a507f188031fc",
+        "llama-cli": "d6158ae18d4ee194492709a918e969f7ce3a38c47bacffc825ec3acfdb703432",
+        "llama-server": "c93b33ca4acfe946ff323e58ee0e2febd773fd1b3b86c5f0abe72aa85bcefaab"
+      },
+      "build_type": "Release",
+      "cmake_flags": [
+        "-DBUILD_SHARED_LIBS=OFF",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DGGML_ACCELERATE=OFF",
+        "-DGGML_BLAS=OFF",
+        "-DGGML_CANN=OFF",
+        "-DGGML_CPU_KLEIDIAI=OFF",
+        "-DGGML_CUDA=OFF",
+        "-DGGML_ET=OFF",
+        "-DGGML_HEXAGON=OFF",
+        "-DGGML_HIP=OFF",
+        "-DGGML_METAL=OFF",
+        "-DGGML_MUSA=OFF",
+        "-DGGML_OPENCL=OFF",
+        "-DGGML_OPENVINO=OFF",
+        "-DGGML_RPC=OFF",
+        "-DGGML_SYCL=OFF",
+        "-DGGML_VIRTGPU=OFF",
+        "-DGGML_VIRTGPU_BACKEND=OFF",
+        "-DGGML_VULKAN=OFF",
+        "-DGGML_WEBGPU=OFF",
+        "-DGGML_ZDNN=OFF",
+        "-DGGML_ZENDNN=OFF",
+        "-DLLAMA_BUILD_EXAMPLES=ON",
+        "-DLLAMA_BUILD_SERVER=ON",
+        "-DLLAMA_BUILD_TESTS=OFF"
+      ],
+      "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+      "cpu_only_configured": true,
+      "kleidiai_configured": false,
+      "runtime_marker_verified": false,
+      "source_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d"
+    },
+    {
+      "backend": "kleidiai",
+      "binaries": {
+        "llama-bench": "build/llama-kleidiai/bin/llama-bench",
+        "llama-cli": "build/llama-kleidiai/bin/llama-cli",
+        "llama-server": "build/llama-kleidiai/bin/llama-server"
+      },
+      "binary_sha256": {
+        "llama-bench": "df532f240e966ea1dae2536ba5360daa8852a413095b3305e4158109a14af26a",
+        "llama-cli": "e5dacb22478be1f91ac1ee4f0051395a216df0063a670d6f2b713ff595b48a10",
+        "llama-server": "5020e911a40ca0fd0bb742638d47d8610b6797846b6dd02c49d7ae118e22e8eb"
+      },
+      "build_type": "Release",
+      "cmake_flags": [
+        "-DBUILD_SHARED_LIBS=OFF",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DGGML_ACCELERATE=OFF",
+        "-DGGML_BLAS=OFF",
+        "-DGGML_CANN=OFF",
+        "-DGGML_CPU_KLEIDIAI=ON",
+        "-DGGML_CUDA=OFF",
+        "-DGGML_ET=OFF",
+        "-DGGML_HEXAGON=OFF",
+        "-DGGML_HIP=OFF",
+        "-DGGML_METAL=OFF",
+        "-DGGML_MUSA=OFF",
+        "-DGGML_OPENCL=OFF",
+        "-DGGML_OPENVINO=OFF",
+        "-DGGML_RPC=OFF",
+        "-DGGML_SYCL=OFF",
+        "-DGGML_VIRTGPU=OFF",
+        "-DGGML_VIRTGPU_BACKEND=OFF",
+        "-DGGML_VULKAN=OFF",
+        "-DGGML_WEBGPU=OFF",
+        "-DGGML_ZDNN=OFF",
+        "-DGGML_ZENDNN=OFF",
+        "-DLLAMA_BUILD_EXAMPLES=ON",
+        "-DLLAMA_BUILD_SERVER=ON",
+        "-DLLAMA_BUILD_TESTS=OFF"
+      ],
+      "compiler": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+      "cpu_only_configured": true,
+      "kleidiai_configured": true,
+      "runtime_marker_verified": true,
+      "source_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d"
+    }
+  ]
+}

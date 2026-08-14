@@ -19,6 +19,10 @@ uses the same official Qwen2.5 1.5B Q4_0 model for the primary backend compariso
 the CPU, measures a deterministic incident workload, and searches serving settings. Every
 candidate must satisfy a held-out quality floor and one hundred percent safety.”
 
+“Run6's v1 test set was used for error analysis and retired. Before the next run, split v2 froze
+twenty final-holdout cases from thirty-six never-executed candidates using only category and case
+ID. Only v2 is called unseen final holdout evidence.”
+
 ## 0:35–1:05 — One-command workflow
 
 **Visual:** `make doctor`, `make benchmark`, `make optimize` with condensed real output.
@@ -33,7 +37,11 @@ decisions before held-out evaluation and selects only a measured feasible profil
 
 **Visual:** Offline headline card, ablation chart, raw claim link.
 
-“This recording slot is reserved for the final same-machine Arm64 Linux result. The video must not be published until the generated claim replaces this honest measurement-pending narration.”
+“These three preregistered outcomes use twenty paired cases and forty formal source rows. Mean time to first token is the primary outcome; only its positive interval can unlock the final result.”
+
+“The primary Q4_0 mean time-to-first-token reduction is 1.79 percent. Its paired 95 percent interval is 0.65 to 2.96 percent. That interval excludes zero on the positive side. ”
+“The secondary Q4_0 p95 end-to-end latency reduction is 2.77 percent. Its paired 95 percent interval is -18.45 to 49.45 percent. That interval crosses zero. This transparent secondary result cannot unlock publication.”
+“The secondary Q4_0 median per-request throughput increase is 2.86 percent. Its paired 95 percent interval is -3.23 to 10.49 percent. That interval crosses zero. This transparent secondary result cannot unlock publication.”
 
 ## Target-device footage
 
@@ -41,7 +49,8 @@ decisions before held-out evaluation and selects only a measured feasible profil
 real backend and case ID, validated diagnosis, and read-only tool calls.
 
 “This is AArch64 Autopilot functioning on the official GitHub-hosted Arm64 Linux runner. The
-displayed response comes from a measured held-out request that also supports the headline claim;
+displayed response comes from a measured split-v2 final-holdout request that also supports the
+primary claim;
 it is not fixture output. The receipt is generated inside that run and records the validated
 diagnosis and tool policy result.”
 
@@ -58,11 +67,11 @@ the complete held-out gate approve it."
 
 ## 2:10–2:38 — Reusability and auditability
 
-**Visual:** `optimized-profile.yaml`, raw run folder, `claims.json`, reproduction command.
+**Visual:** `optimized-profile.yaml`, `claims.json`, attested release bundle, reproduction command.
 
 “Replace the incident cases with another objectively scored agent workload and reuse the same
-pipeline. Every headline links to exact commands, model and binary hashes, CPU proof, run IDs, raw
-requests, and a stated formula.”
+pipeline. The repository carries sanitized formal rows and exact claim IDs; the attested release
+adds the full redacted raw requests, commands, logs, hashes, and integrity receipts.”
 
 ## 2:38–3:00 — Value and close
 

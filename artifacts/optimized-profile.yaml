@@ -1,0 +1,114 @@
+profile_id: kleidiai-q4-0-t4-b128-u64-p1-c2048
+status: measured
+backend: kleidiai
+model_role: strong
+cpu_only: true
+config:
+  threads: 4
+  batch: 128
+  ubatch: 64
+  parallel: 1
+  context: 2048
+  affinity: []
+  quantization: Q4_0
+quality_score: 73.875
+safety_score: 100.0
+p95_latency_ms: 7006.58995545
+requests_per_second: 0.16757651440077947
+peak_rss_mb: 1942.09375
+source_run_ids:
+- 002be1334a7946e99c282be3b8d045f2
+- 0dfa878369d14d24992b321e9e6dba2b
+- 154abc70f2b34a7ca9756ceced659f4c
+- 2a2e5e21956040e5b9e96cc5d7bd0851
+- 312982d35e2f44f9a7237878ee9d46e6
+- 3a41701fce884c9faa3088ec1992e4de
+- 4be2e691f6894725a7ee9fb7e3c86166
+- 63853f2ee95d4918841f2eb799748048
+- 6930951704fb4a6abeb629beb4945451
+- 6a1d881f8fa54203a1df812c4e827ef7
+- 7452f685ae3a4d3d87a19c14f8b84f7e
+- 7c76717f890f4825b7e9cc6c6d238b62
+- 8ec4b99181a9473cb733a326b70df511
+- a57e8fb24c0b4b3c84a3068161c09a1c
+- bab1fe31ef5147d4b840690fb792db38
+- cf3e11e9ca1a45c095dbb2d18d5a497a
+- d20ed8804db040d9809f8803ae651d4d
+- d4b1da043bfa4871a933cc25d346ac5f
+- d6e99674500d48719de54904482df897
+- e894cd904aff41298bfeecc04bdb62a3
+selection_basis: frozen_calibration_finalist
+search_plan_sha256: aaf8a91d06a99f86975fcbfd72c4d9b0d15fa1718161394f06f5fa1247efc612
+calibration_plan_sha256: aaf8a91d06a99f86975fcbfd72c4d9b0d15fa1718161394f06f5fa1247efc612
+frozen_candidate_receipt:
+  candidate:
+    affinity: []
+    backend: kleidiai
+    batch: 128
+    candidate_id: kleidiai-q4-0-t4-b128-u64-p1-c2048
+    context: 2048
+    model_role: strong
+    parallel: 1
+    quantization: Q4_0
+    stage: tuned
+    threads: 4
+    ubatch: 64
+  gate_passed: true
+  gate_reasons: []
+  held_out_case_count: 20
+  result:
+    backend: kleidiai
+    candidate_id: kleidiai-q4-0-t4-b128-u64-p1-c2048
+    config:
+      affinity: []
+      batch: 128
+      context: 2048
+      parallel: 1
+      quantization: Q4_0
+      threads: 4
+      ubatch: 64
+    measured: true
+    model: strong
+    p95_latency_ms: 7006.58995545
+    peak_rss_mb: 1942.09375
+    quality_score: 73.875
+    requests_per_second: 0.16757651440077947
+    safety_score: 100.0
+    schema_failures: 0
+    source_run_ids:
+    - a57e8fb24c0b4b3c84a3068161c09a1c
+    - 154abc70f2b34a7ca9756ceced659f4c
+    - 7c76717f890f4825b7e9cc6c6d238b62
+    - 002be1334a7946e99c282be3b8d045f2
+    - d20ed8804db040d9809f8803ae651d4d
+    - 4be2e691f6894725a7ee9fb7e3c86166
+    - 312982d35e2f44f9a7237878ee9d46e6
+    - 6930951704fb4a6abeb629beb4945451
+    - d6e99674500d48719de54904482df897
+    - cf3e11e9ca1a45c095dbb2d18d5a497a
+    - 8ec4b99181a9473cb733a326b70df511
+    - bab1fe31ef5147d4b840690fb792db38
+    - 2a2e5e21956040e5b9e96cc5d7bd0851
+    - 0dfa878369d14d24992b321e9e6dba2b
+    - 63853f2ee95d4918841f2eb799748048
+    - 7452f685ae3a4d3d87a19c14f8b84f7e
+    - 3a41701fce884c9faa3088ec1992e4de
+    - d4b1da043bfa4871a933cc25d346ac5f
+    - e894cd904aff41298bfeecc04bdb62a3
+    - 6a1d881f8fa54203a1df812c4e827ef7
+    stage: tuned
+gate:
+  kleidiai-q4-0-t4-b128-u64-p1-c2048:
+    passed: true
+    reasons: []
+  a2-kleidiai-q4-0:
+    passed: true
+    reasons: []
+  a0-generic-q8:
+    passed: false
+    reasons:
+    - safety 0.00 < 100.00
+    - quality 67.25 < floor 71.97
+  kleidiai-q4-0-t4-b128-u128-p1-c2048:
+    passed: true
+    reasons: []

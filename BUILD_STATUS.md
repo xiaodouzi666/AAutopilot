@@ -14,8 +14,8 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
   stable CLI/Make targets.
 - [x] Sixty original incident-triage cases, strict schema, read-only tool policy, deterministic
   quality score, and 100% safety gate. The observed v1 test set is retired after failed-run error
-  analysis; the audited v2 40/20 split was frozen before the next run from 36 never-executed
-  candidates using only category and case ID.
+  analysis; the audited v2 40/20 split was frozen before the successful final run from 36
+  never-executed candidates using only category and case ID.
 - [x] Arm hardware/topology doctor, CPU affinity, pinned same-source generic/KleidiAI builds, and
   explicit CPU-only cache/runtime verification.
 - [x] Official Qwen GGUF registry with immutable revisions, SHA-256, byte size, and parsed tensor
@@ -43,21 +43,32 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
 
 - [x] Make the GitHub repository public and push the verified implementation.
 - [x] Preserve failed run6 as diagnostic evidence only, retire its observed v1 test set, and freeze
-  the auditable split-v2 manifest before the next final run.
-- [ ] Obtain a successful official `ubuntu-24.04-arm` split-v2 workflow run and inspect/download its
-  signed, sanitized evidence.
-- [ ] Re-render the narrated final video from that exact evidence and upload it publicly.
-- [ ] Create and review the Devpost draft, upload the thumbnail/video URL, then submit only after the
-  required final explicit confirmation.
+  the auditable split-v2 manifest before the successful final run.
+- [x] Complete and inspect official `ubuntu-24.04-arm` split-v2
+  [run 31766912155](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155) at
+  commit `20f6c0e1e925350d94d04ebb50ede0e0591136b4`.
+- [x] Publish the sanitized evidence in the
+  [release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155)
+  and verify its [GitHub artifact attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497).
+- [x] Publish the [natural-voice demo](https://youtu.be/RT0ORZ3iIpE) as an audio-only derivative
+  of the CI-rendered video, with an explicit non-attested derivative manifest in the release.
+- [ ] Complete the Devpost form and submit only after the required final explicit confirmation.
 
 ## Honest current limitation
 
-The development host is Apple Silicon/macOS. It is valid for source, package, UI, and fixture
-verification but not for the Cloud AI performance claim. Failed run6 is retained for error
-analysis, not as final evidence; its v1 test cases are observed and retired. Until the next
-official Arm64 Linux workflow evaluates the frozen v2 holdout and produces a positive,
-confidence-bounded primary mean-TTFT result, generated local reports remain
-`measurement-pending` and the final video/submission commands intentionally return nonzero.
+The development host is Apple Silicon/macOS, so it remains valid for source, package, UI, and
+fixture verification but not for the Cloud AI performance claim. The competition evidence comes
+instead from successful public Arm64 Linux run 31766912155. Across 20 paired final-holdout cases,
+the primary mean-TTFT reduction was 1.794% with a paired 95% interval of 0.652% to 2.955%, so the
+preregistered publication gate passed. A1/A2 quality was 72.97/73.88 and both safety scores were
+100%. The secondary p95 end-to-end reduction (2.769%, interval -18.448% to 49.453%) and median
+per-request throughput increase (2.857%, interval -3.226% to 10.491%) were not demonstrated and
+are not promoted as wins.
+
+The YouTube demo replaces only the narration of the CI-rendered video. Its H.264 visual stream and
+benchmark content are unchanged, but the derived YouTube MP4 is not itself covered by the GitHub
+attestation. The original CI video remains inside the attested evidence bundle as the authoritative
+source.
 
 Optional Performix and RK3588 profiling remain non-blocking supporting evidence; their absence is
 reported as unavailable rather than silently fabricated.

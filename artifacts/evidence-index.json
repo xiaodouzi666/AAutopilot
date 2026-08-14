@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "workflow": {
+    "run_id": 31766912155,
+    "attempt": 1,
+    "head_sha": "20f6c0e1e925350d94d04ebb50ede0e0591136b4",
+    "run_url": "https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155"
+  },
+  "release": {
+    "tag": "arm64-evidence-run-31766912155",
+    "url": "https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155"
+  },
+  "attestation": {
+    "url": "https://github.com/xiaodouzi666/AAutopilot/attestations/40655497",
+    "subject_name": "aarch64-autopilot-evidence.tar.gz",
+    "subject_sha256": "1ba62246f0049aace7fd7074c6000a46677c0c462e757b26b395b5ddacca1007"
+  },
+  "results": {
+    "paired_final_holdout_cases": 20,
+    "formal_source_rows": 40,
+    "a1_quality_score": 72.97,
+    "a2_quality_score": 73.88,
+    "a1_safety_score": 100.0,
+    "a2_safety_score": 100.0,
+    "primary_mean_ttft_reduction_percent": 1.7935946161895577,
+    "primary_paired_95_ci_percent": [0.6515969938677603, 2.955143181713959],
+    "primary_demonstrated": true,
+    "secondary_p95_e2e_reduction_percent": 2.768626551439474,
+    "secondary_p95_e2e_paired_95_ci_percent": [-18.448447438570422, 49.453028827488474],
+    "secondary_p95_e2e_demonstrated": false,
+    "secondary_median_request_throughput_increase_percent": 2.8571096383420174,
+    "secondary_median_request_throughput_paired_95_ci_percent": [-3.2257349590330993, 10.491224440280039],
+    "secondary_median_request_throughput_demonstrated": false
+  },
+  "video": {
+    "attested_source": {
+      "release_asset": "a64pilot-demo-final.mp4",
+      "manifest_path": "submission/a64pilot-demo-final.manifest.json",
+      "manifest_sha256": "8e39c7b3c9e46a5ad2a28bd005a508c79f1d5c66c8021c932ef36d3da1e67984",
+      "video_sha256": "c6785763c5180ace579ac45269956eb4e13e2f28d05514628111ab5882f41bda",
+      "included_in_attested_evidence_bundle": true
+    },
+    "public_demo": {
+      "youtube_url": "https://youtu.be/RT0ORZ3iIpE",
+      "release_asset": "a64pilot-demo-natural-voice.mp4",
+      "manifest_path": "submission/a64pilot-demo-natural-voice.manifest.json",
+      "manifest_sha256": "aa140617e52f73fad6b982c42702f9865411d364382cb5abfa0b4675b70cfd91",
+      "video_sha256": "62ae7a7839e8b9f8d595df3ae9c5654bb4ea5b81b5b62c397172c6d056261ad1",
+      "audio_only_derivative": true,
+      "visual_stream_unchanged": true,
+      "this_derivative_ci_attested": false,
+      "provenance_note": "Natural narration replaces only the CI source audio; the unchanged visual stream and benchmark content derive from the attested evidence source."
+    }
+  }
+}

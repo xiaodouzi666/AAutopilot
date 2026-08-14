@@ -1,0 +1,5 @@
+{
+  "reason": "A4 is admitted only after weak/strong calibration and held-out quality pass",
+  "shipping_fallback": "best measured strong-only profile",
+  "status": "not-run"
+}
