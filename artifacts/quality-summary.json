@@ -1,0 +1,288 @@
+{
+  "candidates": [
+    {
+      "candidate_id": "a0-generic-q8",
+      "case_count": 10,
+      "case_ids_sha256": "42a55abb8122cee39ffbc67c6504084065bc789d0f5267c5334a680506b37e1c",
+      "final_gate": {
+        "passed": false,
+        "reasons": [
+          "safety 0.00 < 100.00",
+          "quality 67.25 < floor 71.97"
+        ]
+      },
+      "minimum_case_score": 45.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 67.25,
+      "safety_score": 80.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-a0-generic-q8.json",
+        "sha256": "184191b84b4cbe0cbec6d8e35adc1f5bd8b8345f7f30828429844ae5979ca105"
+      },
+      "split": "test"
+    },
+    {
+      "candidate_id": "a1-generic-q4-0",
+      "case_count": 20,
+      "case_ids_sha256": "e80a2b51c7a4df14ae3bb88f3bab3872a4acd0e93148efe55ee64b6dd46c6fe2",
+      "minimum_case_score": 40.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 72.975,
+      "safety_score": 100.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-a1-generic-q4-0.json",
+        "sha256": "ba8a8cfebb0c5606695635087f6169cfbb78d3e288a8a33ccf61209b2b6fcd49"
+      },
+      "split": "test"
+    },
+    {
+      "candidate_id": "a2-kleidiai-q4-0",
+      "case_count": 20,
+      "case_ids_sha256": "e80a2b51c7a4df14ae3bb88f3bab3872a4acd0e93148efe55ee64b6dd46c6fe2",
+      "final_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "minimum_case_score": 40.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 73.875,
+      "safety_score": 100.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-a2-kleidiai-q4-0.json",
+        "sha256": "2a04d65fd5fcfa60737da3d7816bcef88c2f2ebc3149e7652e0da273f28b5272"
+      },
+      "split": "test"
+    },
+    {
+      "calibration_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "candidate_id": "kleidiai-q4-0-t1-b128-u128-p1-c2048",
+      "case_count": 4,
+      "case_ids_sha256": "a54dab78613d975b23f0cb94ca3752c275382f2a827889a5264d031e057affe8",
+      "minimum_case_score": 88.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 91.0,
+      "safety_score": 100.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-kleidiai-q4-0-t1-b128-u128-p1-c2048.json",
+        "sha256": "588e2631ee1c2801689527e7be10e87aaace4c9452495b00603ba60fe339b5cc"
+      },
+      "split": "calibration"
+    },
+    {
+      "calibration_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "candidate_id": "kleidiai-q4-0-t1-b128-u64-p1-c2048",
+      "case_count": 4,
+      "case_ids_sha256": "a54dab78613d975b23f0cb94ca3752c275382f2a827889a5264d031e057affe8",
+      "minimum_case_score": 88.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 91.0,
+      "safety_score": 100.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-kleidiai-q4-0-t1-b128-u64-p1-c2048.json",
+        "sha256": "aad30128270a2803a016d61606f3161d50749ed1a8589f67c047976dbe06fc1a"
+      },
+      "split": "calibration"
+    },
+    {
+      "calibration_gate": {
+        "passed": false,
+        "reasons": [
+          "minimum safety score was not met",
+          "quality 81.0 is below calibration floor 90.000"
+        ]
+      },
+      "candidate_id": "kleidiai-q4-0-t2-b128-u128-p1-c2048",
+      "case_count": 4,
+      "case_ids_sha256": "a54dab78613d975b23f0cb94ca3752c275382f2a827889a5264d031e057affe8",
+      "minimum_case_score": 68.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 81.0,
+      "safety_score": 50.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-kleidiai-q4-0-t2-b128-u128-p1-c2048.json",
+        "sha256": "c72193a254bdf5f1a271988939c14be6d899fda7a6472f7461e1fde3990c8b40"
+      },
+      "split": "calibration"
+    },
+    {
+      "calibration_gate": {
+        "passed": false,
+        "reasons": [
+          "minimum safety score was not met",
+          "quality 81.0 is below calibration floor 90.000"
+        ]
+      },
+      "candidate_id": "kleidiai-q4-0-t2-b128-u64-p1-c2048",
+      "case_count": 4,
+      "case_ids_sha256": "a54dab78613d975b23f0cb94ca3752c275382f2a827889a5264d031e057affe8",
+      "minimum_case_score": 68.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 81.0,
+      "safety_score": 50.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-kleidiai-q4-0-t2-b128-u64-p1-c2048.json",
+        "sha256": "bd289cd41d2e59de508e0f9eacba0620c286f0560bd50bcc11470b3abe4470f9"
+      },
+      "split": "calibration"
+    },
+    {
+      "calibration_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "candidate_id": "kleidiai-q4-0-t4-b128-u128-p1-c2048",
+      "case_count": 20,
+      "case_ids_sha256": "e80a2b51c7a4df14ae3bb88f3bab3872a4acd0e93148efe55ee64b6dd46c6fe2",
+      "final_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "held_out_gate": {
+        "held_out_case_count": 20,
+        "passed": true,
+        "reasons": []
+      },
+      "minimum_case_score": 40.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 73.875,
+      "safety_score": 100.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-kleidiai-q4-0-t4-b128-u128-p1-c2048.json",
+        "sha256": "b346462488414691c7b9f226384d4edc24be5b1eaa574aeec1405b7ed84b96bd"
+      },
+      "split": "test"
+    },
+    {
+      "calibration_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "candidate_id": "kleidiai-q4-0-t4-b128-u64-p1-c2048",
+      "case_count": 20,
+      "case_ids_sha256": "e80a2b51c7a4df14ae3bb88f3bab3872a4acd0e93148efe55ee64b6dd46c6fe2",
+      "final_gate": {
+        "passed": true,
+        "reasons": []
+      },
+      "held_out_gate": {
+        "held_out_case_count": 20,
+        "passed": true,
+        "reasons": []
+      },
+      "minimum_case_score": 40.0,
+      "prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+      "quality_score": 73.875,
+      "safety_score": 100.0,
+      "schema_failure_count": 0,
+      "source": {
+        "path": "artifacts/quality-kleidiai-q4-0-t4-b128-u64-p1-c2048.json",
+        "sha256": "4c040713f318041cdea73e611d9ea1006f8be2aa7f5b17dbd49e3021b7c7b80f"
+      },
+      "split": "test"
+    }
+  ],
+  "cascade": {
+    "a4_admitted_by_quality_gate": null,
+    "claim_policy": "A4 component replay is not presented as live performance or deployment; the shipping profile remains measured strong-only",
+    "performance_claim_eligible": false,
+    "reason": "A4 is admitted only after weak/strong calibration and held-out quality pass",
+    "shipping_profile": "best measured strong-only profile",
+    "status": "not-run"
+  },
+  "compiled_from_report_at": "2026-08-14T04:01:45.230902+00:00",
+  "dataset": {
+    "calibration_cases": 40,
+    "cases": 60,
+    "cases_sha256": "8c73129b9b7991d28e38ad8a7d5a9d5d015649bc8c059d98535c5cb5ae13ac4f",
+    "held_out_cases": 20,
+    "mode": "validation-only",
+    "split_schema_version": "2.0",
+    "split_sha256": "92e312535402fa92903c453f0c84c5799bd0dbc5449e60023d3e6259b138949d",
+    "valid": true
+  },
+  "evaluation_counts": {
+    "calibration_candidate_files": 4,
+    "candidate_files": 9,
+    "formal_measured_rows": 90,
+    "held_out_candidate_files": 5
+  },
+  "evidence_status": "measured",
+  "gate_policy": {
+    "fair_a1_quality_reference": 72.975,
+    "fair_held_out_quality_floor": 71.975,
+    "max_absolute_quality_drop": 1.0,
+    "maximum_schema_failures": 0,
+    "minimum_safety_score": 100.0,
+    "p95_latency_ms": null,
+    "peak_rss_mb": null,
+    "split_rule": "calibration decisions freeze before final held-out evaluation"
+  },
+  "schema_version": "1.0",
+  "selected_profile": {
+    "backend": "kleidiai",
+    "candidate_id": "kleidiai-q4-0-t4-b128-u64-p1-c2048",
+    "gate_passed": true,
+    "gate_reasons": [],
+    "held_out_case_count": 20,
+    "model_role": "strong",
+    "quality_score": 73.875,
+    "safety_score": 100.0,
+    "schema_failure_count": 0,
+    "selection_basis": "frozen_calibration_finalist",
+    "shipping_mode": "strong-only",
+    "source_run_ids": [
+      "a57e8fb24c0b4b3c84a3068161c09a1c",
+      "154abc70f2b34a7ca9756ceced659f4c",
+      "7c76717f890f4825b7e9cc6c6d238b62",
+      "002be1334a7946e99c282be3b8d045f2",
+      "d20ed8804db040d9809f8803ae651d4d",
+      "4be2e691f6894725a7ee9fb7e3c86166",
+      "312982d35e2f44f9a7237878ee9d46e6",
+      "6930951704fb4a6abeb629beb4945451",
+      "d6e99674500d48719de54904482df897",
+      "cf3e11e9ca1a45c095dbb2d18d5a497a",
+      "8ec4b99181a9473cb733a326b70df511",
+      "bab1fe31ef5147d4b840690fb792db38",
+      "2a2e5e21956040e5b9e96cc5d7bd0851",
+      "0dfa878369d14d24992b321e9e6dba2b",
+      "63853f2ee95d4918841f2eb799748048",
+      "7452f685ae3a4d3d87a19c14f8b84f7e",
+      "3a41701fce884c9faa3088ec1992e4de",
+      "d4b1da043bfa4871a933cc25d346ac5f",
+      "e894cd904aff41298bfeecc04bdb62a3",
+      "6a1d881f8fa54203a1df812c4e827ef7"
+    ]
+  },
+  "shared_prompt_sha256": "cbb0e86d7a7b9ab32c5fc664c61379558177d04db7d5dafcc4c37f483a1ce185",
+  "source_files": {
+    "artifacts/cascade-status.json": "9158a0dd81a39a7ca3987584701c7018bbe231ba9b647554d218fef08e540134",
+    "artifacts/optimized-profile.yaml": "817bc0b6fde2cfc794978dad521a274b6a7f2e0edeaf41dfe4164ecd99db9095",
+    "artifacts/quality-a0-generic-q8.json": "184191b84b4cbe0cbec6d8e35adc1f5bd8b8345f7f30828429844ae5979ca105",
+    "artifacts/quality-a1-generic-q4-0.json": "ba8a8cfebb0c5606695635087f6169cfbb78d3e288a8a33ccf61209b2b6fcd49",
+    "artifacts/quality-a2-kleidiai-q4-0.json": "2a04d65fd5fcfa60737da3d7816bcef88c2f2ebc3149e7652e0da273f28b5272",
+    "artifacts/quality-dataset.json": "487c10fbfde0346323742e1edee97ece8498a32bebf3b0d46f78e9d39f0ab402",
+    "artifacts/quality-kleidiai-q4-0-t1-b128-u128-p1-c2048.json": "588e2631ee1c2801689527e7be10e87aaace4c9452495b00603ba60fe339b5cc",
+    "artifacts/quality-kleidiai-q4-0-t1-b128-u64-p1-c2048.json": "aad30128270a2803a016d61606f3161d50749ed1a8589f67c047976dbe06fc1a",
+    "artifacts/quality-kleidiai-q4-0-t2-b128-u128-p1-c2048.json": "c72193a254bdf5f1a271988939c14be6d899fda7a6472f7461e1fde3990c8b40",
+    "artifacts/quality-kleidiai-q4-0-t2-b128-u64-p1-c2048.json": "bd289cd41d2e59de508e0f9eacba0620c286f0560bd50bcc11470b3abe4470f9",
+    "artifacts/quality-kleidiai-q4-0-t4-b128-u128-p1-c2048.json": "b346462488414691c7b9f226384d4edc24be5b1eaa574aeec1405b7ed84b96bd",
+    "artifacts/quality-kleidiai-q4-0-t4-b128-u64-p1-c2048.json": "4c040713f318041cdea73e611d9ea1006f8be2aa7f5b17dbd49e3021b7c7b80f",
+    "artifacts/report-data.json": "9f76501efdcb0c1bb9fac1e16b864c351675b01fc4be81cf2fa19de90a75ecf3",
+    "artifacts/search-plan.json": "aaf8a91d06a99f86975fcbfd72c4d9b0d15fa1718161394f06f5fa1247efc612",
+    "configs/quality-gate.yaml": "095c77a094dd82af160ce564d125f9b432180982ad4b5b00b2d650504a8be0d7"
+  }
+}

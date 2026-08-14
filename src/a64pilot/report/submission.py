@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,31 @@ def render_submission(
     system = report.get("system") or _read_json(artifacts / "system-info.json")
     build = report.get("build") or _read_json(artifacts / "build-manifest.json")
     models = report.get("models") or _read_json(artifacts / "model-manifest.json")
+    evidence_index = _read_json(artifacts / "evidence-index.json") or {}
+    indexed_workflow = (
+        evidence_index.get("workflow") if isinstance(evidence_index, dict) else None
+    ) or {}
+    indexed_release = (
+        evidence_index.get("release") if isinstance(evidence_index, dict) else None
+    ) or {}
+    indexed_attestation = (
+        evidence_index.get("attestation") if isinstance(evidence_index, dict) else None
+    ) or {}
+    github_run_id = os.environ.get("GITHUB_RUN_ID")
+    github_sha = os.environ.get("GITHUB_SHA")
+    evidence_run = {
+        "run_id": github_run_id or indexed_workflow.get("run_id"),
+        "head_sha": github_sha or indexed_workflow.get("head_sha"),
+        "run_url": (
+            f"{repo_url}/actions/runs/{github_run_id}"
+            if github_run_id
+            else indexed_workflow.get("run_url") or f"{repo_url}/actions"
+        ),
+    }
+    # A release and attestation are created after submission materials inside the same workflow.
+    # Never carry an older run's release identifiers into a newly executing evidence job.
+    release = {} if github_run_id else indexed_release
+    attestation = {} if github_run_id else indexed_attestation
     measured = bool(claims) and report.get("evidence_status") == "measured"
     if not allow_pending:
         records, evidence_errors = validate_evidence_bundle(artifacts, require_records=True)
@@ -89,6 +115,9 @@ def render_submission(
         "system": system,
         "build": build,
         "models": models,
+        "evidence_run": evidence_run,
+        "evidence_release": release,
+        "evidence_attestation": attestation,
         "report": report,
         "category": "Cloud AI",
         "project_title": "AArch64 Autopilot: Self-Optimizing Agentic AI on Arm CPUs",

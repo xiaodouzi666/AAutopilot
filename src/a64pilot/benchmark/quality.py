@@ -380,6 +380,8 @@ class ThresholdEvaluation:
     gate: QualityGateResult
     weak_route_share: float
     escalation_rate: float
+    route_counts: dict[str, int]
+    route_shares: dict[str, float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -403,6 +405,8 @@ class FrozenPolicyEvaluation:
     summary: QualitySummary
     weak_route_share: float
     escalation_rate: float
+    route_counts: dict[str, int]
+    route_shares: dict[str, float]
 
 
 def _evaluate_threshold(
@@ -410,11 +414,12 @@ def _evaluate_threshold(
     weak_outputs: Mapping[str, Any],
     strong_outputs: Mapping[str, Any],
     threshold: float | None,
-) -> tuple[QualitySummary, float, float]:
+) -> tuple[QualitySummary, float, float, dict[str, int], dict[str, float]]:
     scores: list[CaseScore] = []
     weak_returned = 0
     weak_attempted = 0
     escalated = 0
+    route_counts = {"weak": 0, "strong": 0, "weak_then_strong": 0}
     for case in cases:
         if case.case_id not in strong_outputs:
             raise KeyError(f"missing strong output for {case.case_id}")
@@ -435,14 +440,23 @@ def _evaluate_threshold(
             ):
                 selected = weak_outputs[case.case_id]
                 weak_returned += 1
+                route_counts["weak"] += 1
             else:
                 escalated += 1
+                route_counts["weak_then_strong"] += 1
+        else:
+            route_counts["strong"] += 1
         scores.append(score_case(case, selected))
     count = len(cases)
+    route_shares = {
+        route: round(100.0 * route_count / count, 6) for route, route_count in route_counts.items()
+    }
     return (
         aggregate_scores(scores),
         round(100.0 * weak_returned / count, 6),
         round(100.0 * escalated / weak_attempted, 6) if weak_attempted else 0.0,
+        route_counts,
+        route_shares,
     )
 
 
@@ -470,10 +484,10 @@ def calibrate_threshold(
     calibration_ids = tuple(case.case_id for case in calibration_cases)
     if len(calibration_ids) != len(set(calibration_ids)):
         raise ValueError("calibration case IDs must be unique")
-    baseline, _, _ = _evaluate_threshold(calibration_cases, {}, strong_outputs, None)
+    baseline, _, _, _, _ = _evaluate_threshold(calibration_cases, {}, strong_outputs, None)
     candidates: list[ThresholdEvaluation] = []
     for threshold in sorted(set(float(value) for value in thresholds)):
-        summary, weak_share, escalation_rate = _evaluate_threshold(
+        summary, weak_share, escalation_rate, route_counts, route_shares = _evaluate_threshold(
             calibration_cases, weak_outputs, strong_outputs, threshold
         )
         gate = evaluate_quality_gate(
@@ -488,6 +502,8 @@ def calibrate_threshold(
                 gate=gate,
                 weak_route_share=weak_share,
                 escalation_rate=escalation_rate,
+                route_counts=route_counts,
+                route_shares=route_shares,
             )
         )
     feasible = [candidate for candidate in candidates if candidate.gate.passed]
@@ -528,7 +544,7 @@ def evaluate_frozen_policy(
         raise SplitLeakageError(f"held-out cases overlap calibration: {sorted(overlap)}")
     if _policy_id(policy.threshold, policy.calibration_case_ids) != policy.policy_id:
         raise SplitLeakageError("frozen policy ID does not match its threshold and calibration IDs")
-    summary, weak_share, escalation_rate = _evaluate_threshold(
+    summary, weak_share, escalation_rate, route_counts, route_shares = _evaluate_threshold(
         held_out_cases,
         weak_outputs,
         strong_outputs,
@@ -539,6 +555,8 @@ def evaluate_frozen_policy(
         summary=summary,
         weak_route_share=weak_share,
         escalation_rate=escalation_rate,
+        route_counts=route_counts,
+        route_shares=route_shares,
     )
 
 

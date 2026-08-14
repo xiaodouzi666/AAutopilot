@@ -3,6 +3,8 @@
 > **Historical planning template only.** Its v1 placeholders and phrasing are not authoritative
 > after failed run6. The final entry must use the split-v2 output generated from
 > `templates/devpost.md.j2` by the successful official Arm workflow.
+> This is one of two explicit legacy exceptions documented in
+> [`placeholder-policy.md`](placeholder-policy.md); it is never a submission surface.
 
 > This is a template. The build must replace every `[[AUTO:...]]` token from verified claim artifacts. Never type an unmeasured number manually.
 

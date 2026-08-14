@@ -17,6 +17,8 @@ SMOKE_FLAGS ?=
 BENCHMARK_FLAGS ?= --quick --repetitions 1
 TUNE_FLAGS ?= --quick --max-candidates 8 --calibration-cases 4 --finalists 2
 OPTIMIZE_FLAGS ?=
+A4_CALIBRATION_FLAGS ?=
+A4_HELD_OUT_FLAGS ?=
 REPORT_FLAGS ?=
 SERVE_FLAGS ?=
 DEMO_FLAGS ?=
@@ -25,7 +27,8 @@ SUBMISSION_FLAGS ?=
 PERFORMIX_ARGS ?=
 
 .PHONY: help sync bootstrap doctor build models verify-models smoke fixture-smoke benchmark tune \
-	select optimize report serve demo verify-source verify verify-backends verify-claims \
+	select a4-calibrate a4-held-out a4 optimize report serve demo verify-source verify \
+	verify-backends verify-claims \
 	submission performix clean-generated
 
 help: ## Show stable project commands and overridable flags.
@@ -40,6 +43,7 @@ help: ## Show stable project commands and overridable flags.
 	  '  make fixture-smoke    Run the labelled non-evidence fixture path' \
 	  '  make benchmark        Run the bounded real Arm64 benchmark (quick by default)' \
 	  '  make tune             Run the topology-derived A3 calibration/finalist search' \
+	  '  make a4               Calibrate/freeze A4, then run its one-time held-out gate' \
 	  '  make optimize         Benchmark, select a quality-feasible profile, and render report' \
 	  '  make report           Regenerate the strict evidence report from raw rows' \
 	  '  make serve            Start the local OpenAI-compatible API (set SERVE_FLAGS)' \
@@ -51,7 +55,8 @@ help: ## Show stable project commands and overridable flags.
 	  '' \
 	  'Common overrides:' \
 	  '  JOBS=4 BUILD_VARIANT=all BUILD_FLAGS="..." MODEL_FLAGS="--minimum"' \
-	  '  BENCHMARK_FLAGS="--quick --repetitions 1" REPORT_FLAGS="--allow-pending"' \
+	  '  BENCHMARK_FLAGS="--quick --repetitions 1" A4_CALIBRATION_FLAGS="..."' \
+	  '  A4_HELD_OUT_FLAGS="..." REPORT_FLAGS="--allow-pending"' \
 	  '  SERVE_FLAGS="--upstream http://127.0.0.1:18180" DEMO_FLAGS="--fixture"' \
 	  '  VERIFY_FLAGS="--source-only" SUBMISSION_FLAGS="--allow-pending"'
 
@@ -88,7 +93,15 @@ tune: ## Run bounded topology-derived A3 calibration and held-out finalist valid
 select: ## Select a measured quality-feasible Pareto profile without rerunning inference.
 	$(UV_RUN) a64pilot optimize $(OPTIMIZE_FLAGS)
 
-optimize: benchmark select report ## Run the complete benchmark/select/report pipeline.
+a4-calibrate: ## Run 40 real weak/strong cases and write the immutable A4 policy.
+	$(UV_RUN) a64pilot benchmark quality --calibrate $(A4_CALIBRATION_FLAGS)
+
+a4-held-out: ## Replay the frozen A4 policy once on all 20 held-out cases.
+	$(UV_RUN) a64pilot benchmark quality --held-out --frozen $(A4_HELD_OUT_FLAGS)
+
+a4: a4-calibrate a4-held-out ## Complete A4 quality admission; gate rejection still ships A3.
+
+optimize: benchmark select a4 report ## Run A0-A4, select/fallback, and render the report.
 
 report: ## Render evidence and fail unless a fair measured claim exists.
 	$(UV_RUN) a64pilot report $(REPORT_FLAGS)

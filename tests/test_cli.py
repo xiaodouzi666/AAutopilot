@@ -4,12 +4,15 @@ import json
 import platform
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
+import a64pilot.benchmark.cascade as cascade_module
 from a64pilot.cli import _all_run_limit, _fair_run_split, app
 from a64pilot.schemas import SystemInfo
 
 runner = CliRunner()
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_version_option_exits_successfully() -> None:
@@ -35,6 +38,43 @@ def test_quick_mode_never_truncates_formal_a1_a2() -> None:
     assert _all_run_limit("a1", quick=True) is None
     assert _all_run_limit("a2", quick=True) is None
     assert _all_run_limit("a3", quick=True) == 10
+
+
+def test_held_out_cli_preflights_before_component_inference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    demo = tmp_path / "demo"
+    demo.mkdir()
+    for name in ("cases.jsonl", "split.json"):
+        (demo / name).write_text(
+            (ROOT / "demo" / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    existing = {
+        "freeze_id": "f" * 64,
+        "a4_admitted_by_quality_gate": False,
+        "shipping_profile": "a3-strong-only",
+        "held_out": {
+            "route_counts": {"weak": 0, "strong": 20, "weak_then_strong": 0},
+            "route_shares": {"weak": 0.0, "strong": 100.0, "weak_then_strong": 0.0},
+            "escalation_rate": 0.0,
+        },
+    }
+    monkeypatch.setattr(
+        cascade_module,
+        "preflight_held_out_evaluation",
+        lambda **_kwargs: (existing, False),
+    )
+
+    def fail_if_collected(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("held-out component inference ran before preflight")
+
+    monkeypatch.setattr(cascade_module, "collect_real_component_outputs", fail_if_collected)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["benchmark", "quality", "--held-out", "--frozen"])
+
+    assert result.exit_code == 0, result.output
+    assert "held-out-frozen-already-recorded" in result.stdout
 
 
 def test_doctor_writes_shared_schema(tmp_path: Path) -> None:

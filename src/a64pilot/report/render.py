@@ -103,6 +103,8 @@ def render_report(
     system = _load_json(artifacts / "system-info.json")
     build = _load_json(artifacts / "build-manifest.json")
     models = _load_json(artifacts / "model-manifest.json")
+    cascade_status = _load_json(artifacts / "cascade-status.json")
+    cascade_quality = _load_json(artifacts / "quality-results.json")
     workload_provenance = _workload_provenance(root)
 
     figures = artifacts / "figures"
@@ -136,6 +138,8 @@ def render_report(
         "system": system,
         "build": build,
         "models": models,
+        "cascade_status": cascade_status,
+        "cascade_quality": cascade_quality,
         **workload_provenance,
         "primary_claim_id": PRIMARY_CLAIM_ID,
         "claims": [claim.model_dump(mode="json") for claim in claims],
@@ -145,6 +149,10 @@ def render_report(
             "The synthetic incident suite is not a general LLM capability benchmark.",
             "No energy or cloud-cost claim is made without a credible counter or supplied price.",
             "Fixture responses are excluded from every performance claim.",
+            (
+                "A4 calibration replays measured weak/strong outputs for quality and routing; "
+                "it is not live-cascade latency, throughput, or combined-RSS evidence."
+            ),
         ],
     }
     write_json(artifacts / "report-data.json", data)

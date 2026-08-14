@@ -172,8 +172,30 @@ def benchmark_quality(
     validate_only: Annotated[
         bool, typer.Option("--validate-only", help="Validate cases, split, and leakage guards.")
     ] = True,
+    calibrate: Annotated[
+        bool,
+        typer.Option("--calibrate", help="Run all 40 measured weak/strong calibration cases."),
+    ] = False,
+    held_out: Annotated[
+        bool,
+        typer.Option("--held-out", help="Evaluate all 20 held-out cases exactly once."),
+    ] = False,
+    frozen: Annotated[
+        bool,
+        typer.Option("--frozen", help="Require and replay the immutable calibrated policy."),
+    ] = False,
+    profile: Annotated[
+        Path,
+        typer.Option(help="Measured A3 strong-only profile supplying frozen runtime settings."),
+    ] = Path("artifacts/optimized-profile.yaml"),
+    policy: Annotated[Path, typer.Option(help="Immutable A4 calibration policy artifact.")] = Path(
+        "artifacts/a4-frozen-policy.json"
+    ),
+    results: Annotated[
+        Path, typer.Option(help="Combined calibration and held-out quality artifact.")
+    ] = Path("artifacts/quality-results.json"),
 ) -> None:
-    """Validate the deterministic 60-case quality suite."""
+    """Validate data, calibrate A4 on 40 cases, or replay it on 20 held-out cases."""
 
     from a64pilot.benchmark.quality import (
         load_cases,
@@ -183,6 +205,13 @@ def benchmark_quality(
         validate_dataset,
     )
 
+    if calibrate and held_out:
+        raise typer.BadParameter("choose --calibrate or --held-out, not both")
+    if held_out != frozen:
+        raise typer.BadParameter("held-out evaluation requires both --held-out and --frozen")
+    if frozen and not held_out:
+        raise typer.BadParameter("--frozen is only valid with --held-out")
+
     cases_path = Path("demo/cases.jsonl")
     split_path = Path("demo/split.json")
     cases = load_cases(cases_path)
@@ -191,7 +220,7 @@ def benchmark_quality(
     # Building every routing view proves labels are stripped at the boundary.
     for case in cases:
         routing_view(case)
-    result = {
+    dataset_result = {
         "valid": True,
         "cases": len(cases),
         "calibration": len(split.calibration),
@@ -201,8 +230,116 @@ def benchmark_quality(
         "mode": "validation-only" if validate_only else "validation-only-no-model-output",
     }
     Path("artifacts").mkdir(exist_ok=True)
-    write_json("artifacts/quality-dataset.json", result)
-    _print_json(result)
+    write_json("artifacts/quality-dataset.json", dataset_result)
+    if not calibrate and not held_out:
+        _print_json(dataset_result)
+        return
+
+    from a64pilot.benchmark.cascade import (
+        CascadeRuntimePlan,
+        CascadeWorkflowError,
+        collect_real_component_outputs,
+        evaluate_held_out,
+        freeze_calibration,
+        load_frozen_calibration,
+        preflight_held_out_evaluation,
+    )
+
+    try:
+        if calibrate:
+            from a64pilot.benchmark.quality import QualityGateConfig as CascadeQualityGateConfig
+            from a64pilot.runtime.deployment import load_measured_profile
+            from a64pilot.settings import load_settings
+
+            measured = load_measured_profile(profile)
+            if measured.backend != "kleidiai" or measured.model_role != "strong":
+                raise CascadeWorkflowError(
+                    "A4 calibration requires a measured KleidiAI A3 strong-only profile"
+                )
+            runtime = CascadeRuntimePlan(
+                binary=measured.binary,
+                cmake_cache=measured.cmake_cache,
+                weak_model=_model_path("weak-q4-0"),
+                strong_model=measured.model,
+                threads=measured.threads,
+                batch=measured.batch,
+                ubatch=measured.ubatch,
+                parallel=measured.parallel,
+                context=measured.context,
+                affinity=measured.affinity,
+                weak_quantization="Q4_0",
+                strong_quantization=measured.quantization,
+            )
+            evidence = collect_real_component_outputs(
+                runtime,
+                split="calibration",
+                phase="calibration",
+                include_weak=True,
+            )
+            configured_gate = load_settings().quality_gate
+            payload = freeze_calibration(
+                runtime,
+                evidence,
+                policy_path=policy,
+                gate_config=CascadeQualityGateConfig(**configured_gate.model_dump()),
+            )
+            _print_json(
+                {
+                    "mode": "calibration",
+                    "case_count": 40,
+                    "freeze_id": payload["freeze_id"],
+                    "policy": payload["policy"],
+                    "policy_path": str(policy),
+                }
+            )
+            return
+
+        existing, status_recovered = preflight_held_out_evaluation(
+            policy_path=policy,
+            cases_path=cases_path,
+            split_path=split_path,
+            results_path=results,
+        )
+        if existing is not None:
+            _print_json(
+                {
+                    "mode": "held-out-frozen-already-recorded",
+                    "case_count": 20,
+                    "freeze_id": existing["freeze_id"],
+                    "a4_admitted_by_quality_gate": existing["a4_admitted_by_quality_gate"],
+                    "shipping_profile": existing["shipping_profile"],
+                    "route_counts": existing["held_out"]["route_counts"],
+                    "route_shares": existing["held_out"]["route_shares"],
+                    "escalation_rate": existing["held_out"]["escalation_rate"],
+                    "results_path": str(results),
+                    "status_recovered": status_recovered,
+                }
+            )
+            return
+        frozen_payload, routing_policy, runtime, _ = load_frozen_calibration(policy)
+        evidence = collect_real_component_outputs(
+            runtime,
+            split="test",
+            phase="held-out",
+            include_weak=not routing_policy.fallback_strong_only,
+        )
+        payload = evaluate_held_out(evidence, policy_path=policy, results_path=results)
+        _print_json(
+            {
+                "mode": "held-out-frozen",
+                "case_count": 20,
+                "freeze_id": frozen_payload["freeze_id"],
+                "a4_admitted_by_quality_gate": payload["a4_admitted_by_quality_gate"],
+                "shipping_profile": payload["shipping_profile"],
+                "route_counts": payload["held_out"]["route_counts"],
+                "route_shares": payload["held_out"]["route_shares"],
+                "escalation_rate": payload["held_out"]["escalation_rate"],
+                "results_path": str(results),
+            }
+        )
+    except (CascadeWorkflowError, ValueError, OSError) as exc:
+        typer.echo(f"A4 quality workflow failed: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
 
 def _default_threads() -> int:
@@ -441,14 +578,18 @@ def benchmark_all(
     except TuneSearchError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(2) from exc
-    write_json(
-        "artifacts/cascade-status.json",
-        {
-            "status": "not-run",
-            "shipping_fallback": "best measured strong-only profile",
-            "reason": "A4 is admitted only after weak/strong calibration and held-out quality pass",
-        },
-    )
+    cascade_status = Path("artifacts/cascade-status.json")
+    if not cascade_status.exists():
+        write_json(
+            cascade_status,
+            {
+                "status": "not-run",
+                "shipping_fallback": "best measured strong-only profile",
+                "reason": (
+                    "A4 is admitted only after weak/strong calibration and held-out quality pass"
+                ),
+            },
+        )
     render_report()
     typer.echo(
         "A0–A2 and bounded A3 search completed; "
@@ -784,6 +925,7 @@ def verify(
     validate_dataset(load_cases("demo/cases.jsonl"), load_split("demo/split.json"))
     secret_hits: list[str] = []
     ignored_roots = {
+        ".a64pilot",
         ".git",
         ".mypy_cache",
         ".pytest_cache",
@@ -805,8 +947,11 @@ def verify(
             secret_hits.append(str(path))
     errors = [f"secret pattern: {path}" for path in secret_hits]
     if not source_only:
+        from a64pilot.benchmark.cascade import verify_cascade_evidence
+
         records, evidence_errors = validate_evidence_bundle("artifacts", require_records=True)
         errors.extend(evidence_errors)
+        errors.extend(verify_cascade_evidence("artifacts"))
         claims_path = Path("artifacts/claims.json")
         if claims_path.is_file():
             try:

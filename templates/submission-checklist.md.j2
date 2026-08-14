@@ -2,21 +2,59 @@
 
 Generated {{ generated_at }} for **{{ project_title }}**.
 
-- [{{ "x" if measured else " " }}] Same-machine Arm64 Linux evidence exists and produced validated claims.
-- [ ] Devpost project thumbnail uploaded.
-- [ ] Public repository opens when signed out: {{ repo_url }}.
-- [ ] GitHub recognizes the root Apache-2.0 license.
-- [ ] Generic-Q4_0 and KleidiAI-Q4_0 use the same model checksum and settings.
-- [ ] KleidiAI logs contain the Q4 kernel marker and, for the exact pinned strong Q4_0 model,
-  only the reviewed Q6_K `output.weight` fallback warning; any other fallback is rejected.
-- [ ] CPU-only flags, GPU backend disablement, and KleidiAI runtime marker are visible.
-- [ ] Calibration and held-out results are separated.
-- [ ] Claim intervals, sample counts, memory, quality, safety, and source run IDs are visible.
-- [ ] `make verify` and `make submission` pass from the final commit.
-- [ ] Secret scan and public-artifact redaction pass.
-- [ ] All Devpost materials are English.
-- [ ] Required custom questions use the reviewed answers in the write-up.
-- [{{ "x" if video_url else " " }}] Public demo video is under three minutes and uses real values only.
-- [ ] Final Devpost submit action explicitly confirmed and live receipt verified before 15 August 2026 01:00 CEST.
+Status legend: checked items have a named artifact or public URL below. An unchecked item is not
+claimed complete.
+
+## Local and Arm evidence gates
+
+- [{{ "x" if measured else " " }}] Same-machine Arm64 Linux evidence produced validated claims:
+  [run {{ evidence_run.get("run_id", "see Actions") }}]({{ evidence_run.get("run_url") }}),
+  measured source SHA `{{ evidence_run.get("head_sha", "recorded by the workflow") }}`.
+- [{{ "x" if measured else " " }}] Generic-Q4_0 and KleidiAI-Q4_0 use the same model checksum and
+  settings; `artifacts/build-manifest.json`, `artifacts/model-manifest.json`, and formal rows are
+  included in the attested release.
+- [{{ "x" if measured else " " }}] KleidiAI Q4 kernel proof, reviewed one-tensor Q6_K
+  `output.weight` fallback, CPU-only flags, and disabled GPU devices passed the strict verifier.
+- [{{ "x" if measured else " " }}] Calibration and final holdout are separated; quality, safety,
+  sample counts, confidence intervals, memory, and source run IDs are recorded in
+  `artifacts/quality-summary.json`, `artifacts/report-data.json`, and `artifacts/claims.json`.
+  A4 quality/routing evidence is stored separately in `artifacts/quality-results.json` when run.
+- [{{ "x" if measured else " " }}] Strict `make verify` and `make submission` completed inside the
+  official Arm run. Every measured artifact names the exact runtime source revision; later source
+  changes require a new target run.
+- [{{ "x" if measured else " " }}] Secret scan and public-artifact redaction passed. {% if evidence_attestation.get("url") %}The release bundle is covered by [the workflow attestation]({{ evidence_attestation.get("url") }}).{% else %}The same official run publishes the signed attestation after this checklist is rendered.{% endif %}
+
+## Public submission surfaces
+
+- [x] Repository opens publicly: {{ repo_url }}.
+- [x] Root [Apache-2.0 license]({{ repo_url }}/blob/main/LICENSE) is visible and recognized.
+- [x] Devpost thumbnail is uploaded and publicly readable. The 1536×1024 source is rendered by
+  Devpost as this [333×222 preview](https://d112y698adiu2z.cloudfront.net/photos/production/software_thumbnail_photos/005/097/643/datas/medium.png).
+- [x] All final Devpost materials and required custom answers are in English in
+  `artifacts/devpost-writeup-final.md`.
+- [x] Four evidence screenshots, their captions, timecodes, source hashes, and frame hashes are in
+  `artifacts/screenshots/manifest.json`.
+- [x] The public [demo video](https://youtu.be/RT0ORZ3iIpE) is under three minutes, contains no
+  music, and uses only measured values. Its unchanged visual stream derives from the attested CI
+  video; the natural narration derivative is disclosed in `artifacts/evidence-index.json`.
+- [x] The {% if evidence_release.get("url") %}[evidence release]({{ evidence_release.get("url") }}){% else %}[evidence releases]({{ repo_url }}/releases){% endif %} and
+  [workflow run]({{ evidence_run.get("run_url") }}) are linked from the Devpost draft.
+- [ ] Formal Devpost submission receipt and submitted timestamp are not recorded yet.
+
+## Reproducible final checks
+
+```bash
+uv run --frozen --no-editable python scripts/generate-submission-assets.py --verify-only
+uv run --frozen --no-editable python scripts/check-final-placeholders.py
+```
 
 Evidence status: **{{ "measured" if measured else "measurement pending — not ready for final submit" }}**.
+Formal Devpost status: **not submitted until a receipt and timestamp are recorded**.
+
+Measured source commit: `{{ evidence_run.get("head_sha", "recorded by the workflow") }}`
+
+Public repository: {{ repo_url }}
+
+Devpost draft: https://devpost.com/software/aarch64-autopilot-self-optimizing-agentic-ai-on-arm-cpus
+
+Public video: https://youtu.be/RT0ORZ3iIpE

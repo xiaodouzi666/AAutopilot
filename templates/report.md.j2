@@ -27,6 +27,24 @@ No performance claim is available. Complete the fair same-machine Arm64 Linux ge
 {% if not summaries %}| _none_ | measurement pending | — | 0 | — | — | — | — | — |
 {% endif %}
 
+## A4 quality-gated cascade
+
+{% if cascade_status is defined and cascade_status %}
+**Status:** `{{ cascade_status.get("status", "unknown") }}`. **Shipping profile:** `{{ cascade_status.get("shipping_profile", cascade_status.get("shipping_fallback", "not selected")) }}`.
+
+{{ cascade_status.get("reason", "No A4 reason was recorded.") }}
+{% if cascade_quality is defined and cascade_quality and cascade_quality.get("held_out") %}
+
+Held-out route distribution: weak {{ "%.2f"|format(cascade_quality["held_out"]["route_shares"]["weak"]) }}%, strong {{ "%.2f"|format(cascade_quality["held_out"]["route_shares"]["strong"]) }}%, weak→strong {{ "%.2f"|format(cascade_quality["held_out"]["route_shares"]["weak_then_strong"]) }}%; escalation rate {{ "%.2f"|format(cascade_quality["held_out"]["escalation_rate"]) }}% of weak attempts. The held-out quality gate {% if cascade_quality["held_out"]["gate"]["passed"] %}passed{% else %}did not pass{% endif %}.
+
+This A4 result is measured quality/routing evidence only. Its component replay is explicitly ineligible for live-cascade latency, throughput, or combined-memory claims.
+
+{{ cascade_quality["held_out"].get("evaluation_design", "This split is separate from calibration but is not presented as newly unseen evidence beyond its recorded provenance.") }}
+{% endif %}
+{% else %}
+A4 has not been calibrated. The measured strong-only profile remains the shipping fallback.
+{% endif %}
+
 ## Evidence contract
 
 The fair Arm-specific comparison holds the target, source commit, official Q4_0 model checksum, prompt set, sampling, affinity, threads, batch, micro-batch, concurrency, and lifecycle constant. The intended variable is only the generic versus KleidiAI CPU backend. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K `output.weight`; that single fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. CPU-only proof and the primary KleidiAI Q4 marker are required, and any additional or different fallback is rejected.
@@ -42,10 +60,10 @@ reduction and median per-request throughput increase are transparent secondary o
 three are rendered from the same 20 paired cases (40 formal A1/A2 source rows); only a positive
 primary interval whose lower bound exceeds zero can unlock final publication.
 
-The submitted API profile is strong-only. Its public boundary applies constrained triage JSON and
-fails closed when schema, read-only tool policy, safety, or consistency validation fails. A4
-weak/strong routing remains a future experiment unless calibration and the complete held-out gate
-approve a measured multi-runtime profile.
+The submitted API profile remains strong-only until a separately measured live-cascade performance
+run and deployment profile exist. Its public boundary applies constrained triage JSON and fails
+closed when schema, read-only tool policy, safety, or consistency validation fails. A4 quality
+admission never substitutes component replay timings for live multi-runtime evidence.
 
 ## Limitations
 

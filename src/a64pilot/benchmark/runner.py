@@ -126,6 +126,7 @@ class RealServiceBenchmark:
         self,
         *,
         artifacts_dir: Path | str = "artifacts",
+        build_manifest_path: Path | str = "artifacts/build-manifest.json",
         cases_path: Path | str = "demo/cases.jsonl",
         split_path: Path | str = "demo/split.json",
         seed: int = 20260813,
@@ -133,6 +134,7 @@ class RealServiceBenchmark:
         startup_timeout_s: float = 240.0,
     ) -> None:
         self.artifacts_dir = Path(artifacts_dir)
+        self.build_manifest_path = Path(build_manifest_path)
         self.store = ArtifactStore(self.artifacts_dir / "raw")
         self.cases_path = Path(cases_path)
         self.split_path = Path(split_path)
@@ -272,7 +274,7 @@ class RealServiceBenchmark:
                             raise BenchmarkEnvironmentError("; ".join(post_request_backend.errors))
                         if not post_request_cpu.verified:
                             raise BenchmarkEnvironmentError("; ".join(post_request_cpu.errors))
-                        _mark_kleidiai_runtime_verified(self.artifacts_dir / "build-manifest.json")
+                        _mark_kleidiai_runtime_verified(self.build_manifest_path)
                         runtime_marker_recorded = True
                 for repetition in range(repetitions):
                     for case in cases:
@@ -313,9 +315,7 @@ class RealServiceBenchmark:
                         if not run_cpu_proof.verified:
                             raise BenchmarkEnvironmentError("; ".join(run_cpu_proof.errors))
                         if candidate.backend == "kleidiai" and not runtime_marker_recorded:
-                            _mark_kleidiai_runtime_verified(
-                                self.artifacts_dir / "build-manifest.json"
-                            )
+                            _mark_kleidiai_runtime_verified(self.build_manifest_path)
                             runtime_marker_recorded = True
                         record = BenchmarkRecord(
                             run_id=run_id,
@@ -347,7 +347,7 @@ class RealServiceBenchmark:
                             completion_tokens=completion_tokens,
                             generation_tok_s=generation_rate,
                             peak_rss_mb=manager.peak_rss_bytes / (1024 * 1024),
-                            route="strong",
+                            route="weak" if candidate.model_role == "weak" else "strong",
                             schema_valid=score.schema_valid,
                             quality_score=score.quality_score,
                             safety_score=score.safety_score,

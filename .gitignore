@@ -21,6 +21,7 @@ htmlcov/
 
 # Generated runtime data. Curated public evidence is force-added deliberately.
 /artifacts/raw/
+/artifacts/a4/runs/
 /artifacts/runtime/
 /artifacts/tmp/
 /artifacts/*.log

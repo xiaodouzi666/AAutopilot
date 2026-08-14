@@ -252,8 +252,12 @@ def _sha256(path: Path) -> str:
 def _refresh_public_integrity(destination: Path) -> None:
     """Rehash sanitized copies so redaction remains transparent and reviewable."""
 
-    raw_root = destination / "raw"
-    if raw_root.is_dir():
+    # Main A0-A3 rows live at ``raw/``.  A4 quality-calibration component rows
+    # deliberately live under ``a4/runs/<session>/raw/`` so they cannot be
+    # mistaken for live cascade performance.  Rehash every evidence store after
+    # public redaction, regardless of that intentional namespace separation.
+    raw_roots = sorted(path for path in destination.rglob("raw") if path.is_dir())
+    for raw_root in raw_roots:
         for run_dir in sorted(path for path in raw_root.iterdir() if path.is_dir()):
             hashes = {
                 str(path.relative_to(run_dir)): _sha256(path)

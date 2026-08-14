@@ -326,7 +326,8 @@ The remaining competition window is short. Complete a valid Devpost draft and re
   - Create final submission checklist with deadline.
 
   **Acceptance:**
-  - No `{{...}}`, `TBD`, fake metric, broken link, secret, or private hostname remains.
+  - No unresolved renderer token, fake metric, broken link, secret, or private hostname remains
+    on a publishable surface. Historical source exceptions follow `placeholder-policy.md`.
   - Public repo contains all source and instructions but no model binaries.
   - README identifies Cloud AI and explains meaningful new work during challenge.
   - Video is under three minutes if produced.
@@ -337,7 +338,7 @@ The remaining competition window is short. Complete a valid Devpost draft and re
   make verify
   make submission
   git status --short
-  grep -RInE '\{\{|TBD|TODO_METRIC|YOUR_RESULT' README.md artifacts/devpost-writeup-final.md && exit 1 || true
+  uv run --frozen --no-editable python scripts/check-final-placeholders.py
   gh auth status || true
   ```
 

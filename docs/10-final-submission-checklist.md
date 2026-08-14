@@ -1,5 +1,8 @@
 # Final Submission Checklist
 
+This file is the reusable preflight. The evidence-backed state for the current entry, including
+public URLs and the one still-open receipt item, is `artifacts/submission-checklist.md`.
+
 ## Eligibility and accounts
 
 - [ ] Devpost account is active.
@@ -54,7 +57,8 @@
 - [ ] Public repository URL is correct.
 - [ ] Testing instructions are free and do not require private credentials.
 - [ ] Custom required questions have answers.
-- [ ] No `[[AUTO:...]]`, `{{...}}`, `TBD`, or invented result remains.
+- [ ] The final placeholder-policy scanner passes; no unresolved token or invented result remains
+  on a publishable surface.
 
 ## Images and video
 
@@ -79,8 +83,8 @@ make report
 
 git status --short
 
-grep -RInE '\[\[AUTO:|\{\{|TBD|TODO_METRIC|YOUR_RESULT|sk-[A-Za-z0-9]' \
-  README.md artifacts docs templates && exit 1 || true
+uv run --frozen --no-editable python scripts/check-final-placeholders.py
+uv run --frozen --no-editable python scripts/generate-submission-assets.py --verify-only
 ```
 
 Record:

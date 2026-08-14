@@ -37,6 +37,33 @@ publication. It never invents a metric. The output is strictly shorter than thre
 manifest records mode, duration, claim data, narration settings, and SHA-256 hashes for every
 source and the video. Inspect that manifest before upload.
 
+## Final screenshot set and aggregate quality receipt
+
+The four Devpost screenshots are exact frames from the attested CI video, not reconstructed
+graphics. Given a local copy of the `a64pilot-demo-final.mp4` release asset, regenerate the
+quality summary, screenshots, timecodes, captions, and provenance manifest with:
+
+```bash
+uv run --frozen --no-editable python scripts/generate-submission-assets.py \
+  --video /path/to/a64pilot-demo-final.mp4
+```
+
+The command refuses a video whose SHA-256 does not match the measured publishable manifest. It
+also cross-checks all nine candidate quality records against the report, search plan, frozen
+split, selected profile, and cascade status. A clean checkout can verify the committed downstream
+artifacts without downloading the video:
+
+```bash
+uv run --frozen --no-editable python scripts/generate-submission-assets.py --verify-only
+```
+
+`artifacts/screenshots/manifest.json` records the source video/release/run, the four reviewed
+timecodes and scene windows, each 1920×1080 frame hash, and the data-source hashes behind its
+caption. `artifacts/quality-summary.json` records the A0–A3 candidate quality summary and selected
+strong-only profile. When A4 is executed, `artifacts/quality-results.json` separately records its
+frozen 40-case calibration, 20-case final-holdout gate, and route distribution without claiming
+live-cascade performance.
+
 The final video includes a dedicated “Functioning on the Arm target” scene. It shows the official
 GitHub Arm runner run ID, Arm64 Linux/kernel provenance, real backend and case ID, validated model
 diagnosis, and read-only tool calls. The receipt generator itself refuses non-Linux/non-Arm hosts,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import runpy
 from pathlib import Path
 from typing import Any
@@ -146,3 +148,29 @@ def test_sanitized_copy_normalizes_then_passes_strict_recheck(tmp_path: Path) ->
     public_findings, public_scanned = REDACTOR["process_in_place"]([destination], write=False)
     assert public_scanned == 1
     assert public_findings == []
+
+
+def test_sanitized_copy_rehashes_nested_a4_component_store(tmp_path: Path) -> None:
+    source = tmp_path / "artifacts"
+    run_dir = source / "a4" / "runs" / "held-out-example" / "raw" / ("a" * 32)
+    run_dir.mkdir(parents=True)
+    proof = run_dir / "runtime-proof.txt"
+    proof.write_text("peer=10.42.0.7\n", encoding="utf-8")
+    (run_dir / "integrity.json").write_text(
+        json.dumps(
+            {"sha256": {"runtime-proof.txt": hashlib.sha256(proof.read_bytes()).hexdigest()}}
+        ),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "artifacts-public"
+
+    REDACTOR["sanitized_copy"](source, destination)
+
+    public_run = destination / run_dir.relative_to(source)
+    public_proof = public_run / "runtime-proof.txt"
+    manifest = json.loads((public_run / "integrity.json").read_text(encoding="utf-8"))
+    assert public_proof.read_text(encoding="utf-8") == "peer=<redacted-ip>\n"
+    assert (
+        manifest["sha256"]["runtime-proof.txt"]
+        == hashlib.sha256(public_proof.read_bytes()).hexdigest()
+    )
