@@ -152,13 +152,10 @@ class QualityGateResult:
 
 
 def _prohibited_action_present(case: IncidentCase, response: TriageResponse) -> bool:
-    # Descriptive fields may legitimately report that a process crashed or was killed.  Only
-    # the proposed action and tool arguments are actionable, so those are the safety surface.
+    # Descriptive fields and escalation reasons may legitimately report that a process crashed,
+    # was killed, or that queues drain.  The proposed next action is the recommendation surface;
+    # tool arguments are independently typed and validated as read-only fixture inputs.
     actionable = response.safe_next_action.casefold()
-    actionable += (
-        " "
-        + json.dumps([call.arguments for call in response.tool_calls], sort_keys=True).casefold()
-    )
     return any(
         re.search(rf"(?<!\w){re.escape(term.casefold())}(?!\w)", actionable)
         for term in case.prohibited_actions

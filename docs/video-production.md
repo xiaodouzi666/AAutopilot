@@ -30,9 +30,10 @@ is Q4_0 or that no fallback exists.
 
 It refuses to render if evidence is pending, claims are empty or malformed, report claims differ,
 or a required figure is missing. Final mode also reuses the strict evidence-bundle verifier,
-recomputes claims from raw records, verifies their complete held-out source coverage, and requires
-at least one demonstrated positive claim whose confidence-interval lower bound is above zero. It
-never invents a metric. The output is strictly shorter than three minutes and its adjacent JSON
+recomputes claims from raw records, verifies their complete split-v2 source coverage, and requires
+the preregistered primary mean-TTFT claim to be positive with a confidence-interval lower bound
+above zero. Secondary p95 E2E and throughput outcomes remain visible but cannot unlock final
+publication. It never invents a metric. The output is strictly shorter than three minutes and its adjacent JSON
 manifest records mode, duration, claim data, narration settings, and SHA-256 hashes for every
 source and the video. Inspect that manifest before upload.
 

@@ -1,5 +1,9 @@
 # Three-Minute Demo Video Script
 
+> **Historical planning script only.** The publishable split-v2 video is generated from
+> `templates/video-script.md.j2` and `scripts/render-demo-video.py`; this v1 placeholder script
+> must never be uploaded.
+
 > Target length: 165–175 seconds. Hard maximum: 180 seconds. Use the real Arm64 terminal and generated report. No copyrighted music is needed.
 
 ## Preparation

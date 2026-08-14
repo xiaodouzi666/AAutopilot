@@ -9,7 +9,11 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from a64pilot.report.claims import generate_claims, has_demonstrated_improvement
+from a64pilot.report.claims import (
+    PRIMARY_CLAIM_ID,
+    generate_claims,
+    has_demonstrated_improvement,
+)
 from a64pilot.report.integrity import scan_text, validate_evidence_bundle, verify_claim_sources
 from a64pilot.schemas import Claim
 
@@ -55,7 +59,8 @@ def render_submission(
             evidence_errors.append("report claims do not exactly match recomputed claims")
         if not has_demonstrated_improvement(typed_claims):
             evidence_errors.append(
-                "no positive headline improvement has a confidence interval above zero"
+                "the preregistered primary mean-TTFT claim does not have a positive "
+                "confidence interval above zero"
             )
         missing = [
             name
@@ -80,6 +85,7 @@ def render_submission(
         "repo_url": repo_url,
         "video_url": video_url,
         "claims": claims,
+        "primary_claim_id": PRIMARY_CLAIM_ID,
         "system": system,
         "build": build,
         "models": models,

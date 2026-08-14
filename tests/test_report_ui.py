@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from html.parser import HTMLParser
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+from a64pilot.report.claims import PRIMARY_CLAIM_ID
+from a64pilot.report.render import render_report
+
+ROOT = Path(__file__).parents[1]
 
 
 class _NavigationParser(HTMLParser):
@@ -21,9 +28,8 @@ class _NavigationParser(HTMLParser):
 
 
 def test_offline_report_navigation_targets_exist() -> None:
-    root = Path(__file__).parents[1]
     environment = Environment(
-        loader=FileSystemLoader(root / "templates"),
+        loader=FileSystemLoader(ROOT / "templates"),
         undefined=StrictUndefined,
         autoescape=False,
     )
@@ -35,6 +41,10 @@ def test_offline_report_navigation_targets_exist() -> None:
         claims=[],
         summaries=[],
         limitations=["Target-specific."],
+        cases_sha256="a" * 64,
+        split_sha256="b" * 64,
+        split_schema_version="2.0",
+        primary_claim_id=PRIMARY_CLAIM_ID,
     )
     parser = _NavigationParser()
     parser.feed(rendered)
@@ -43,3 +53,45 @@ def test_offline_report_navigation_targets_exist() -> None:
     assert {f"#{target}" for target in expected} <= set(parser.hrefs)
     assert rendered.count("<h1>") == 1
     assert 'aria-label="Report sections"' in rendered
+    assert "aaaaaaaaaaaa…" in rendered
+    assert "bbbbbbbbbbbb…" in rendered
+
+
+def test_report_data_fingerprints_current_cases_and_split(tmp_path: Path) -> None:
+    demo = tmp_path / "demo"
+    demo.mkdir()
+    cases = demo / "cases.jsonl"
+    split = demo / "split.json"
+    cases.write_text(
+        '{"case_id":"incident-001","category":"simple"}\n',
+        encoding="utf-8",
+    )
+    split.write_text(
+        json.dumps(
+            {
+                "schema_version": "2.0",
+                "seed": 20260813,
+                "calibration": [],
+                "test": [f"incident-{index:03d}" for index in range(1, 21)],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rendered = render_report(
+        project_root=tmp_path,
+        templates_dir=ROOT / "templates",
+    )
+    report_data = json.loads(
+        (tmp_path / "artifacts" / "report-data.json").read_text(encoding="utf-8")
+    )
+    expected_cases = hashlib.sha256(cases.read_bytes()).hexdigest()
+    expected_split = hashlib.sha256(split.read_bytes()).hexdigest()
+    assert report_data["cases_sha256"] == expected_cases
+    assert report_data["split_sha256"] == expected_split
+    assert report_data["split_schema_version"] == "2.0"
+    assert report_data["primary_claim_id"] == PRIMARY_CLAIM_ID
+    assert expected_cases[:12] in rendered["markdown"].read_text(encoding="utf-8")
+    assert expected_split[:12] in rendered["html"].read_text(encoding="utf-8")

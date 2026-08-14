@@ -33,6 +33,7 @@ REPORT_FIGURES = ("ablation.png", "pareto.png")
 TARGET_RECEIPT_NAME = "arm-target-demo-receipt.json"
 TARGET_RECEIPT_SCHEMA = "1.0"
 ESPEAK_VOICE = "en-us"
+PRIMARY_CLAIM_ID = "fair_q4_0_mean_ttft_reduction"
 
 
 class MediaNotReady(RuntimeError):
@@ -283,15 +284,23 @@ def validate_evidence(
             rows = claim["source_rows"]
             if not isinstance(rows, list) or not rows:
                 raise MediaNotReady("measured claim has no source rows")
-        if not any(
-            claim["demonstrated"] is True
-            and float(claim["value"]) > 0
-            and float(claim["confidence_interval"][0]) > 0
-            for claim in claims
+        primary = next(
+            (claim for claim in claims if claim["claim_id"] == PRIMARY_CLAIM_ID),
+            None,
+        )
+        if primary is None or claims[0]["claim_id"] != PRIMARY_CLAIM_ID:
+            raise MediaNotReady(
+                "final video refused: the preregistered primary mean-TTFT claim is missing "
+                "or is not first"
+            )
+        if not (
+            primary["demonstrated"] is True
+            and float(primary["value"]) > 0
+            and float(primary["confidence_interval"][0]) > 0
         ):
             raise MediaNotReady(
-                "final video refused: no positive headline improvement has a confidence "
-                "interval above zero"
+                "final video refused: the preregistered primary mean-TTFT claim does not "
+                "have a positive confidence interval above zero"
             )
     for name in REPORT_FIGURES:
         figure = artifacts / "figures" / name
@@ -344,7 +353,10 @@ def validate_final_evidence_against_raw(
         ]:
             errors.append("media claims do not exactly match claims recomputed from raw evidence")
         if not has_demonstrated_improvement(typed_claims):
-            errors.append("no positive headline improvement has a confidence interval above zero")
+            errors.append(
+                "the preregistered primary mean-TTFT claim does not have a positive "
+                "confidence interval above zero"
+            )
     except Exception as exc:
         if isinstance(exc, MediaNotReady):
             raise
@@ -361,14 +373,26 @@ def _claim_narration(claim: Mapping[str, Any]) -> str:
     value = float(claim["value"])
     unit = str(claim["unit"])
     low, high = (float(item) for item in claim["confidence_interval"])
-    conclusion = (
-        "The interval excludes zero."
-        if claim["demonstrated"]
-        else "The interval crosses zero, so this is not claimed as an improvement."
+    if low > 0:
+        interval = "The interval excludes zero on the positive side."
+    elif high < 0:
+        interval = "The interval excludes zero on the negative side."
+    else:
+        interval = "The interval crosses zero."
+    primary = claim["claim_id"] == PRIMARY_CLAIM_ID
+    decision = (
+        "The preregistered final gate passes."
+        if primary and claim["demonstrated"]
+        else (
+            "The final gate does not pass."
+            if primary
+            else "This transparent secondary outcome cannot unlock publication."
+        )
     )
+    role = "primary" if primary else "secondary"
     return (
-        f"The measured {metric} is {value:.2f} {unit}. Its paired 95 percent interval is "
-        f"{low:.2f} to {high:.2f} {unit}. {conclusion}"
+        f"The {role} {metric} is {value:.2f} {unit}, with a paired 95 percent interval of "
+        f"{low:.2f} to {high:.2f} {unit}. {interval} {decision}"
     )
 
 
@@ -399,14 +423,13 @@ def build_slides(
                 "same llama.cpp commit and Qwen2.5 1.5B Q4_0 model",
                 "generic CPU ↔ verified KleidiAI Q4 kernel",
                 "inventory: 197 Q4_0 tensors + one reviewed Q6_K output.weight",
-                "bounded tuning → held-out quality and safety gate",
+                "split v2: 20 cases frozen from 36 never-executed candidates",
             ),
-            "The primary comparison builds generic and KleidiAI enabled llama.cpp from the "
-            "same commit and serves the same Qwen2.5 1.5B Q4 zero model. The pipeline records "
-            "CPU-only proof and requires the primary KleidiAI Q4 kernel marker. The exact pinned "
-            "inventory contains 197 Q4 zero tensors and one reviewed Q6 K output weight fallback; "
-            "any additional fallback is rejected. It freezes decisions and keeps only "
-            "quality-feasible candidates.",
+            "The fair comparison serves one Qwen model through same-commit generic and KleidiAI "
+            "builds, proves CPU-only execution and the KleidiAI Q4 marker, and rejects inventory "
+            "drift. After run six exposed and retired v1, split v2 froze twenty cases from "
+            "thirty-six never-executed candidates using only category and case ID. All decisions "
+            "freeze before final evaluation.",
         ),
     ]
     if draft:
@@ -439,18 +462,24 @@ def build_slides(
                 f"runner, run {receipt.run_id}. A real {receipt.backend} model request for "
                 f"{receipt.case_id} returned {receipt.diagnosis}, invoked only validated "
                 "read-only tools, and passed the same schema, safety, and consistency gate "
-                "used by the deployed endpoint.",
+                "used by the deployed endpoint on the split-v2 final holdout.",
             )
         )
         for index, claim in enumerate(claims):
             low, high = claim["confidence_interval"]
+            role = "PRIMARY" if claim["claim_id"] == PRIMARY_CLAIM_ID else "SECONDARY"
             slides.append(
                 Slide(
                     str(claim["metric"]),
                     (
+                        f"{role} • 20 paired cases • {len(claim['source_rows'])} formal source rows",
                         f"{float(claim['value']):.2f}{claim['unit']}",
                         f"paired 95% interval: {float(low):.2f} to {float(high):.2f}{claim['unit']}",
-                        f"source rows: {len(claim['source_rows'])}",
+                        (
+                            "only this outcome can unlock final publication"
+                            if role == "PRIMARY"
+                            else "transparent secondary; never unlocks publication"
+                        ),
                     ),
                     _claim_narration(claim),
                     artifacts / "figures" / REPORT_FIGURES[index % len(REPORT_FIGURES)],
@@ -475,12 +504,13 @@ def build_slides(
                 "Inspect every claim",
                 (
                     "commands • model and binary hashes • run IDs",
-                    "raw requests • paired formulas • confidence intervals",
+                    "sanitized formal rows • paired formulas • confidence intervals",
+                    "full redacted raw capture • attested release bundle",
                     REPOSITORY_URL,
                 ),
-                "The pre-rendered report is available offline. Strict replay requires the "
-                "original Arm capture inputs, while the public GitHub Actions run and artifact "
-                "attestation provide the authoritative execution provenance.",
+                "The repository carries the sanitized formal rows and claim index. The full "
+                "redacted raw capture is in the attested release bundle, while the public GitHub "
+                "Actions run provides authoritative execution provenance.",
             ),
             Slide(
                 "Measured. Quality-gated. GPU-free.",

@@ -12,8 +12,10 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
 
 - [x] Apache-2.0 repository, English README, third-party notices, locked Python environment, and
   stable CLI/Make targets.
-- [x] Sixty original incident-triage cases, frozen 40/20 calibration/held-out split, strict schema,
-  read-only tool policy, deterministic quality score, and 100% safety gate.
+- [x] Sixty original incident-triage cases, strict schema, read-only tool policy, deterministic
+  quality score, and 100% safety gate. The observed v1 test set is retired after failed-run error
+  analysis; the audited v2 40/20 split was frozen before the next run from 36 never-executed
+  candidates using only category and case ID.
 - [x] Arm hardware/topology doctor, CPU affinity, pinned same-source generic/KleidiAI builds, and
   explicit CPU-only cache/runtime verification.
 - [x] Official Qwen GGUF registry with immutable revisions, SHA-256, byte size, and parsed tensor
@@ -23,6 +25,8 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
   bounded calibration-only tuning, frozen finalists, and full twenty-case held-out admission.
 - [x] Fail-closed evidence/claim/report/submission gates with command, request, response, binary,
   model, source, host, split, and runtime-marker replay.
+- [x] Prospectively registered primary mean-TTFT reduction plus transparent secondary p95 E2E and
+  throughput outcomes; only a positive primary confidence interval can unlock final publication.
 - [x] Validated strong-only OpenAI-compatible API, local report UI, metrics, fixture smoke mode, and
   strict measured-profile deployment loader.
 - [x] Official Arm64 GitHub Actions pipeline for build, model download, benchmark, report, target
@@ -37,9 +41,11 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
 
 ## Publication status
 
-- [ ] Make the GitHub repository public and push the first verified commit.
-- [ ] Obtain a successful official `ubuntu-24.04-arm` workflow run and inspect/download its signed,
-  sanitized evidence.
+- [x] Make the GitHub repository public and push the verified implementation.
+- [x] Preserve failed run6 as diagnostic evidence only, retire its observed v1 test set, and freeze
+  the auditable split-v2 manifest before the next final run.
+- [ ] Obtain a successful official `ubuntu-24.04-arm` split-v2 workflow run and inspect/download its
+  signed, sanitized evidence.
 - [ ] Re-render the narrated final video from that exact evidence and upload it publicly.
 - [ ] Create and review the Devpost draft, upload the thumbnail/video URL, then submit only after the
   required final explicit confirmation.
@@ -47,8 +53,10 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
 ## Honest current limitation
 
 The development host is Apple Silicon/macOS. It is valid for source, package, UI, and fixture
-verification but not for the Cloud AI performance claim. Until the official Arm64 Linux workflow
-produces a positive, confidence-bounded same-machine A1/A2 result, generated local reports remain
+verification but not for the Cloud AI performance claim. Failed run6 is retained for error
+analysis, not as final evidence; its v1 test cases are observed and retired. Until the next
+official Arm64 Linux workflow evaluates the frozen v2 holdout and produces a positive,
+confidence-bounded primary mean-TTFT result, generated local reports remain
 `measurement-pending` and the final video/submission commands intentionally return nonzero.
 
 Optional Performix and RK3588 profiling remain non-blocking supporting evidence; their absence is

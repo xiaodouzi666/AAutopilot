@@ -51,7 +51,7 @@ Use deterministic generation settings for quality comparisons:
 temperature = 0.0
 top_p = 1.0
 seed = fixed if supported
-max output tokens = 192
+max output tokens = 512
 context = fixed, initially 2048 or 4096
 ```
 
@@ -112,11 +112,43 @@ Run only on the 40 calibration cases. Select:
 
 Store all calibration results, but keep them visually separate from final held-out claims.
 
+The authoritative final split is `demo/split.json` schema version 2.0. It was frozen before
+the next final run using the following preregistered procedure:
+
+1. Treat the 20 test cases from split v1 and the four v1 calibration cases executed during
+   the failed run (`incident-001`, `incident-002`, `incident-004`, and `incident-005`) as
+   observed. This is a 24-case exclusion set.
+2. Use only the remaining 36 v1 calibration cases as candidates for the new final test set.
+3. For every candidate, compute the lowercase hexadecimal digest
+   `sha256(f"{domain}|{seed}|{case_id}")`, where
+   `domain = "a64pilot-final-holdout-v2"` and `seed = 20260813`. Category is used only to
+   stratify candidates; it is not part of the digest input.
+4. Sort each category by digest ascending and select 6 `simple`, 7 `multi`, 3 `noisy`, and
+   4 `ambiguous` cases. Store the selected union in global `(digest, case_id)` ascending order.
+5. Form calibration from the 20 unselected v1 calibration cases in their old order (therefore
+   preserving `001/002/004/005` as the first four), followed by all 20 v1 test cases in their
+   old order.
+
+The manifest must cover 60 unique IDs, contain exactly 40 calibration and 20 test IDs, have
+the stated test-category quotas, and have zero overlap between the v2 test set and the 24-case
+observed exclusion set. A test enforces the procedure rather than only checking the final
+counts. The immutable audit record `demo/split-freeze-v2.json` stores both split hashes, the
+observed and eligible pools, every candidate digest and category, and the selected order.
+Selection consumed only case ID and category: it did not consume expected answers, tool or
+safety labels, model outputs, quality scores, latency, or any other run result.
+
 ### 5.5 Held-out stage
 
 Freeze all decisions before running the 20 held-out cases. Evaluate the five ablation stages with at least three repetitions per case where time permits. A minimum reduced run may use one quality repetition plus repeated performance probes, but the report must disclose this.
 
 Do not change thresholds after viewing held-out labels.
+
+The v1 test set was executed in failed Arm run `31758292648` (`run6`) and then used for error
+analysis, so it is calibration evidence and must never again be described as unseen or final
+held-out evidence. Split v2 was frozen after that analysis and before the next run. Only the
+v2 test cases may be described as the unseen final holdout, meaning they had not previously
+been executed or inspected through run outputs; the source dataset itself is public, so this
+is not a claim that the case text or labels are secret.
 
 ## 6. Baselines and ablations
 
@@ -254,7 +286,23 @@ Do not use “X% faster” ambiguously; label the exact metric.
 - Pair requests by case and repetition.
 - Report median and p95 for latency.
 - Report mean and standard deviation for token rates where conventional.
-- Compute 95% bootstrap confidence intervals for headline deltas with a fixed seed.
+- For the complete A1 generic-Q4_0/A2 KleidiAI-Q4_0 pair, prospectively preregister mean
+  time-to-first-token reduction as the single primary metric on unseen split v2. Also
+  preregister p95 end-to-end latency reduction and median per-request throughput increase
+  (where per-request throughput is `1000 / E2E_ms`) as transparent secondary metrics.
+- Compute a paired 95% bootstrap confidence interval for each of those three metrics using
+  the same complete 20-case paired rows, 5,000 resamples, and seed `20260813`. Use the mean,
+  p95, and median reducer respectively.
+- Publish headline claims only when both A1 and A2 cover every required v2 test
+  case/repetition, every row is schema-valid, both aggregate safety scores are 100%, and A2
+  mean quality is no more than 1.0 absolute point below A1.
+- Once the pair is eligible, report all three preregistered metrics, including negative values
+  or intervals crossing zero; do not select only the most favorable metric. Only a positive
+  primary mean-TTFT reduction whose 95% paired interval lower bound is greater than zero may
+  unlock publication of a demonstrated-improvement result. Secondary p95 E2E and throughput
+  results are always displayed but can never unlock publication on their own, even if positive.
+  This decision rule is fixed before executing split v2 to prevent multiple-comparison
+  cherry-picking.
 - Show coefficient of variation.
 - Flag rather than hide unstable runs.
 - Include sample count next to every chart/table.

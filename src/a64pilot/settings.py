@@ -9,6 +9,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+BENCHMARK_MAX_OUTPUT_TOKENS = 512
+
 
 class ProjectConfig(BaseModel):
     name: str = "aarch64-autopilot"
@@ -45,7 +47,7 @@ class BenchmarkConfig(BaseModel):
     repetitions: int = Field(default=3, ge=1)
     max_search_minutes: int = Field(default=120, ge=1)
     random_seed: int = 20260813
-    max_output_tokens: int = Field(default=192, ge=1)
+    max_output_tokens: int = Field(default=BENCHMARK_MAX_OUTPUT_TOKENS, ge=1)
     temperature: float = Field(default=0.0, ge=0)
 
 

@@ -28,9 +28,11 @@ OpenAI-compatible API  ←  selected profile  →  raw evidence + offline report
 
 The included workload is safe cloud incident triage over 60 original synthetic fixtures.
 Each case has an expected diagnosis, severity, read-only tool set, prohibited actions, and
-escalation behavior. Forty cases calibrate tuning and the optional A4 routing experiment;
-twenty stay held out until final evaluation. The agent never executes model-generated shell
-commands.
+escalation behavior. Split v1's test cases were executed during failed run6 and used for error
+analysis, so they are retired from final evaluation. Before the next run, split v2 selected 20
+final-holdout cases from 36 never-executed candidates with a frozen category-stratified hash whose
+only inputs were category and case ID; the other 40 cases calibrate tuning. Only v2 is described
+as the unseen final holdout. The agent never executes model-generated shell commands.
 
 ## Why this is Arm-specific
 
@@ -47,8 +49,10 @@ commands.
 - The tuner derives thread and affinity candidates from the actual Arm topology.
 
 No result is hard-coded into this README. Public performance claims are generated only
-from paired raw rows on the recorded Arm64 Linux target. Fixture/demo responses carry an
-explicit `fixture` label and cannot support a claim.
+from paired raw rows on the recorded Arm64 Linux target. Mean TTFT reduction is the
+prospectively registered primary outcome; p95 end-to-end latency and per-request throughput
+are transparent secondary outcomes that cannot unlock final publication. Fixture/demo responses
+carry an explicit `fixture` label and cannot support a claim.
 
 ## Outputs
 
@@ -132,7 +136,8 @@ layout, and cleanup. It is visibly labelled and excluded from `claims.json`.
 
 The strict local gate replays internal consistency from source/model registries, downloaded
 hashes, native binary hashes, CMake caches, CPU-only commands, runtime logs, fixed prompts,
-constrained-response schemas, response scores, timings, and all 20 held-out case pairs. It is
+constrained-response schemas, response scores, timings, and all 20 split-v2 final-holdout case
+pairs. It is
 designed to catch missing, inconsistent, edited, or unsupported evidence; it is not described
 as a cryptographic proof of physical execution by itself.
 
@@ -146,8 +151,9 @@ gh attestation verify aarch64-autopilot-evidence.tar.gz \
   -R xiaodouzi666/AAutopilot
 ```
 
-The GitHub Actions run and attestation URL are the authoritative execution provenance; the
-committed report and raw rows remain the human- and machine-reviewable evidence.
+The GitHub Actions run and attestation URL are the authoritative execution provenance. The
+repository carries the sanitized formal rows, generated report, and claim index for convenient
+review; the attested release bundle carries the full redacted raw capture and integrity receipts.
 
 ## Stable commands
 
@@ -168,9 +174,12 @@ Run `make help` for flags and fixture alternatives.
 
 ## Benchmark contract
 
-The final protocol freezes the target and software stack, separates calibration from the
-held-out split, retains failures and outliers, reports p50/p95/dispersion, and uses fixed-seed
-paired bootstrap intervals. The required ablations are:
+The final protocol freezes the target and software stack, separates calibration from split v2's
+final holdout, retains failures and outliers, reports p50/p95/dispersion, and uses fixed-seed
+paired bootstrap intervals. The immutable selection record is
+[`demo/split-freeze-v2.json`](demo/split-freeze-v2.json): it records the retired/observed v1 IDs,
+all 36 never-executed candidates, their categories and case-ID hashes, both split hashes, and the
+selected v2 set. The required ablations are:
 
 1. A0 — generic Q8 strong-model reference;
 2. A1 — generic Q4_0 strong-model fair baseline;
@@ -179,8 +188,11 @@ paired bootstrap intervals. The required ablations are:
 5. A4 — quality-gated weak/strong cascade, only if it passes.
 
 If A4 fails the safety, schema, or quality gate, the project ships A3 and preserves A4 as
-a rejected experiment. A confidence interval crossing zero is described as “no demonstrated
-improvement,” never as a win.
+a rejected experiment. The fair A1/A2 comparison always reports all three preregistered outcomes
+from the same 20 paired cases (40 formal source rows): primary mean TTFT reduction, secondary p95
+end-to-end latency reduction, and secondary median per-request throughput increase. Only a
+positive primary 95% paired interval whose lower bound exceeds zero unlocks final publication;
+secondary results are never promoted into a win.
 
 The submitted deployment implementation is the measured **strong-only** profile. A4 remains an
 experimental candidate and is not described as deployed unless a future version calibrates it,

@@ -33,10 +33,13 @@ pinned inventory contains 197 Q4_0 tensors and one disclosed Q6_K `output.weight
 fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. Verification
 requires the primary KleidiAI Q4 marker and rejects any additional or different fallback.
 
-The included workload contains 60 original synthetic cloud incidents. Forty cases are used
-only for tuning and the optional A4 routing experiment; twenty remain held out until every
-decision is frozen. The agent may request deterministic read-only fixture tools; it never
-executes model-generated shell commands.
+The included workload contains 60 original synthetic cloud incidents. The v1 test set was
+executed in failed run6 and used for error analysis, so it is retired from final evaluation.
+Before the next run, split v2 selected 20 final-holdout cases from 36 never-executed candidates
+with a frozen category-stratified hash procedure whose only inputs were category and case ID.
+Only v2 is described as the unseen final holdout; `demo/split-freeze-v2.json` preserves every
+selection input and both split hashes. The agent may request deterministic read-only fixture
+tools; it never executes model-generated shell commands.
 
 ## Why This Matters
 
@@ -80,11 +83,12 @@ project's non-negotiable rule that no performance number can be fabricated.
 1. Evidence-backed Arm feature and topology doctor with public redaction.
 2. Fair same-commit generic and `GGML_CPU_KLEIDIAI=ON` native builds.
 3. Official Qwen model resolution with immutable revision, SHA-256, size, and license manifest.
-4. Sixty-case deterministic safe incident benchmark with a fixed 40/20 split.
+4. Sixty-case deterministic safe incident benchmark with an auditable frozen v2 40/20 split.
 5. CPU-only `llama-server` lifecycle, RSS sampling, streaming TTFT/E2E timing, and cleanup.
 6. Bounded candidate generation, hard quality/safety feasibility rules, and Pareto selection.
 7. OpenAI-compatible `/v1/chat/completions`, `/v1/models`, `/health`, `/metrics`, and `/report`.
-8. Offline report, raw JSON/CSV, figures, claim formulas, source run IDs, and integrity hashes.
+8. Offline report, sanitized formal JSON/CSV, figures, claim formulas, source run IDs, and
+   integrity hashes, plus a full redacted raw capture in the attested release bundle.
 
 ## Architecture
 
@@ -100,13 +104,20 @@ inference.
 ## Measured Results
 
 {% if measured %}
-The public report contains {{ report.measurement_count }} measured request rows. Headline claims:
+The direct A1/A2 comparison covers **20 paired final-holdout cases / {{ claims[0].source_rows|length }}
+formal source rows**. Mean time-to-first-token reduction is the prospectively registered primary
+outcome; p95 end-to-end latency reduction and median per-request throughput increase are
+transparent secondary outcomes from that same source set:
 
-{% for claim in claims %}- **{{ claim.metric }}:** {{ "%.3f"|format(claim.value) }}{{ claim.unit }} with 95% paired bootstrap interval {{ "%.3f"|format(claim.confidence_interval[0]) }} to {{ "%.3f"|format(claim.confidence_interval[1]) }}{{ claim.unit }}. {% if claim.demonstrated %}The interval excludes zero.{% else %}The interval crosses zero, so this is not presented as a demonstrated improvement.{% endif %} Sources: {{ claim.source_rows|join(", ") }}.
+{% for claim in claims %}- **{% if claim.claim_id == primary_claim_id %}Primary{% else %}Secondary{% endif %} — {{ claim.metric }}:** {{ "%.3f"|format(claim.value) }}{{ claim.unit }} with paired 95% bootstrap interval {{ "%.3f"|format(claim.confidence_interval[0]) }} to {{ "%.3f"|format(claim.confidence_interval[1]) }}{{ claim.unit }}. {% if claim.confidence_interval[0] > 0 %}The interval excludes zero on the positive side.{% elif claim.confidence_interval[1] < 0 %}The interval excludes zero on the negative side.{% else %}The interval crosses zero.{% endif %} {% if claim.claim_id == primary_claim_id %}{% if claim.demonstrated %}The preregistered primary gate passes.{% else %}The final improvement gate does not pass.{% endif %}{% else %}This outcome is disclosed transparently and cannot unlock final publication.{% endif %}
 {% endfor %}
 
-Every number is generated from the committed/public evidence bundle; see `artifacts/claims.json`
-and `artifacts/raw/` for formulas, commands, hashes, and request rows.
+Exact formulas and the shared 40 source IDs are listed once in
+[`artifacts/claims.json`]({{ repo_url }}/blob/main/artifacts/claims.json), rather than repeated
+three times here. The repository carries the sanitized formal rows and generated report; the
+[successful Arm evidence run]({{ repo_url }}/actions/workflows/arm64-evidence.yml) produces the
+attested full redacted raw archive, which is also published with the GitHub Release and carries
+the run directories, commands, logs, and integrity receipts.
 {% else %}
 The implementation and fixture demo are complete, but the final same-machine Arm64 Linux run has
 not yet produced a valid fair claim. No macOS or fixture number is being presented as competition
@@ -170,8 +181,9 @@ repository. The live inference service binds to localhost by default for safety.
 
 The hardest part was making a faster result incapable of hiding a correctness regression.
 Backend, quantization, serving parameters, model routing, and memory residency interact. The
-solution was a same-model ablation, strict calibration/held-out separation, deterministic scoring,
-fail-closed response validation, repeated timing, and provenance generated alongside each claim.
+solution was a same-model ablation, a retired observed v1 split plus a mechanically frozen v2
+final holdout, deterministic scoring, fail-closed response validation, paired timing, and
+provenance generated alongside each claim.
 Native runtime interfaces also evolve, so the command builder discovers the pinned binary's
 supported CPU-only options rather than assuming an old interface.
 

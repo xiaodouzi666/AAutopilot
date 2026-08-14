@@ -11,6 +11,7 @@ import platform
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Final
 from uuid import uuid4
 
 from a64pilot.agent.prompt import build_messages, prompt_fingerprint
@@ -42,10 +43,14 @@ from a64pilot.runtime.llama_command import LlamaServerConfig, inspect_llama_serv
 from a64pilot.runtime.openai_client import OpenAIClient
 from a64pilot.runtime.process_manager import LlamaServerProcess, find_available_port
 from a64pilot.schemas import BenchmarkRecord, BuildManifest
+from a64pilot.settings import BENCHMARK_MAX_OUTPUT_TOKENS
 
 
 class BenchmarkEnvironmentError(RuntimeError):
     pass
+
+
+REAL_BENCHMARK_MAX_TOKENS: Final[int] = BENCHMARK_MAX_OUTPUT_TOKENS
 
 
 def _wait_for_kleidiai_load_proof(
@@ -124,13 +129,17 @@ class RealServiceBenchmark:
         cases_path: Path | str = "demo/cases.jsonl",
         split_path: Path | str = "demo/split.json",
         seed: int = 20260813,
-        max_tokens: int = 256,
+        max_tokens: int = REAL_BENCHMARK_MAX_TOKENS,
         startup_timeout_s: float = 240.0,
     ) -> None:
         self.artifacts_dir = Path(artifacts_dir)
         self.store = ArtifactStore(self.artifacts_dir / "raw")
-        self.cases = load_cases(cases_path)
-        self.split = load_split(split_path)
+        self.cases_path = Path(cases_path)
+        self.split_path = Path(split_path)
+        self.cases_sha256 = sha256_file(self.cases_path)
+        self.split_sha256 = sha256_file(self.split_path)
+        self.cases = load_cases(self.cases_path)
+        self.split = load_split(self.split_path)
         validate_dataset(self.cases, self.split)
         self.seed = seed
         self.max_tokens = max_tokens
@@ -138,7 +147,12 @@ class RealServiceBenchmark:
 
     def selected_cases(self, split: str, limit: int | None = None) -> tuple[IncidentCase, ...]:
         ids = self.split.calibration if split == "calibration" else self.split.test
-        selected = tuple(case for case in self.cases if case.case_id in set(ids))
+        # The frozen manifest order is part of the benchmark protocol.  In particular,
+        # bounded calibration intentionally takes a prefix of that manifest; filtering the
+        # dataset in file order would silently evaluate a different prefix after a split
+        # amendment.
+        cases_by_id = {case.case_id: case for case in self.cases}
+        selected = tuple(cases_by_id[case_id] for case_id in ids)
         return selected[:limit] if limit is not None else selected
 
     async def run_candidate(
@@ -346,6 +360,10 @@ class RealServiceBenchmark:
                             "run-config.json",
                             {
                                 "candidate": asdict(candidate),
+                                "dataset": {
+                                    "cases_sha256": self.cases_sha256,
+                                    "split_sha256": self.split_sha256,
+                                },
                                 "prompt_sha256": prompt_fingerprint(),
                                 "triage_schema": triage_json_schema(),
                                 "backend_proof": run_backend_proof.to_dict(),

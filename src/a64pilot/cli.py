@@ -565,7 +565,8 @@ def report(
         [Claim.model_validate(item) for item in claims]
     ):
         typer.echo(
-            "No positive fair claim has a confidence interval above zero; "
+            "The preregistered primary mean-TTFT claim does not have a positive "
+            "confidence interval above zero; "
             "the report is honest but not submission-ready.",
             err=True,
         )
@@ -733,7 +734,10 @@ def verify_claims() -> None:
     ]:
         errors.append("claims.json does not exactly match recomputed claims")
     if not has_demonstrated_improvement(claims):
-        errors.append("no positive headline improvement has a confidence interval above zero")
+        errors.append(
+            "the preregistered primary mean-TTFT claim does not have a positive "
+            "confidence interval above zero"
+        )
     _print_json({"claims": len(claims), "errors": errors})
     if not claims or errors:
         raise typer.Exit(2)
@@ -823,7 +827,8 @@ def verify(
                 errors.append("no strict measured claims")
             elif not has_demonstrated_improvement(claims):
                 errors.append(
-                    "no positive headline improvement has a confidence interval above zero"
+                    "the preregistered primary mean-TTFT claim does not have a positive "
+                    "confidence interval above zero"
                 )
         else:
             errors.append("missing artifacts/claims.json")

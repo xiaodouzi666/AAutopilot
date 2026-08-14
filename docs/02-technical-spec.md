@@ -219,7 +219,7 @@ benchmark:
   repetitions: 3
   max_search_minutes: 120
   random_seed: 20260813
-  max_output_tokens: 192
+  max_output_tokens: 512
   temperature: 0.0
 
 quality_gate:
@@ -412,12 +412,32 @@ Aggregate quality is the mean case score. Safety is reported separately and must
 
 ### Dataset split
 
-Create a fixed `demo/split.json` using the project seed:
+Use the frozen `demo/split.json` v2 manifest:
 
 - calibration: 40 case IDs;
 - held-out test: 20 case IDs.
 
-The router may use calibration labels but never held-out expected labels. The report must show the split and hash.
+Run `31758292648` (`run6`) exposed the old split-v1 test 20 plus v1 calibration cases
+`incident-001`, `incident-002`, `incident-004`, and `incident-005`. Its held-out evaluation
+failed and those 24 cases were used for error analysis; they are therefore observed
+calibration evidence, not unseen final evidence.
+
+Before the next run, v2 was deterministically frozen from the 36 unobserved v1 calibration
+cases. Within each category, rank case `case_id` ascending by
+`sha256(f"a64pilot-final-holdout-v2|20260813|{case_id}")` and take category quotas 6 `simple`,
+7 `multi`, 3 `noisy`, and 4 `ambiguous`. Category is used to stratify only and is not hashed.
+Store the selected union in global `(digest, case_id)` order. Calibration is the 20 unselected
+v1 calibration IDs in their prior order (with
+`001/002/004/005` first), followed by the 20 v1 test IDs in prior order.
+
+Automated validation must prove 40/20 sizes, 60 unique IDs, exact quotas, exact deterministic
+selection, and zero v2-test overlap with the 24 observed cases. The router may use calibration
+labels but never v2 held-out expected labels. The report must show the split and hash. Only
+the v2 test set may be called the unseen final holdout, narrowly meaning it had not been
+executed or inspected in prior run output; the public dataset is not secret. The immutable
+`demo/split-freeze-v2.json` audit record preserves both split hashes and every selection input
+and digest. Split selection uses only case ID and category, never private answer/tool/safety
+labels, model outputs, scores, latency, or other run results.
 
 ## 9. Complexity router and cascade
 
@@ -635,7 +655,21 @@ For repeated measurements:
 
 - report median, p50, p95, mean, standard deviation, and coefficient of variation;
 - compute paired speedup where candidate and baseline share the same case/repetition;
-- produce a 95% bootstrap confidence interval for headline latency and throughput deltas;
+- prospectively preregister mean TTFT reduction as the only primary complete-pair A1/A2
+  metric on unseen split v2; preregister p95 E2E latency reduction and median per-request
+  throughput increase (`1000 / E2E_ms` per row) as transparent secondary outputs;
+- calculate all three on the same complete 20-case paired rows, with a paired 95% bootstrap
+  interval using 5,000 resamples, seed `20260813`, and the mean, p95, and median reducer
+  respectively;
+- generate no headline claims unless both candidates have every required case/repetition,
+  zero schema-invalid rows, 100% safety, and A2 mean quality no more than 1.0 absolute point
+  below A1;
+- once eligible, display all three preregistered metrics even when a value is negative or a
+  confidence interval crosses zero; never choose only the most favorable result;
+- unlock publication of a demonstrated-improvement result only when the primary mean-TTFT
+  reduction is positive and its 95% paired interval lower bound exceeds zero; secondary p95
+  E2E and throughput metrics never unlock publication by themselves, which fixes the
+  multiple-comparison decision rule before the v2 run;
 - flag unstable metrics where coefficient of variation exceeds a documented threshold, initially 10%;
 - retain outliers rather than deleting them silently;
 - document warmup count, repetition count, and any failed runs.

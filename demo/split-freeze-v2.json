@@ -1,0 +1,274 @@
+{
+  "schema_version": "2.0",
+  "domain": "a64pilot-final-holdout-v2",
+  "seed": 20260813,
+  "cases_sha256": "8c73129b9b7991d28e38ad8a7d5a9d5d015649bc8c059d98535c5cb5ae13ac4f",
+  "category_quotas": {
+    "simple": 6,
+    "multi": 7,
+    "noisy": 3,
+    "ambiguous": 4
+  },
+  "old_split_sha256": "783f6ab1461d5eaa0daf9de89787506c64451519362e2dc7f85bd406a934a77d",
+  "run6_id": "31758292648",
+  "observed_v1_calibration_ids": [
+    "incident-001",
+    "incident-002",
+    "incident-004",
+    "incident-005"
+  ],
+  "observed_v1_test_ids": [
+    "incident-003",
+    "incident-007",
+    "incident-011",
+    "incident-014",
+    "incident-018",
+    "incident-020",
+    "incident-022",
+    "incident-025",
+    "incident-029",
+    "incident-033",
+    "incident-036",
+    "incident-038",
+    "incident-040",
+    "incident-043",
+    "incident-046",
+    "incident-049",
+    "incident-052",
+    "incident-055",
+    "incident-058",
+    "incident-060"
+  ],
+  "observed_ids": [
+    "incident-001",
+    "incident-002",
+    "incident-004",
+    "incident-005",
+    "incident-003",
+    "incident-007",
+    "incident-011",
+    "incident-014",
+    "incident-018",
+    "incident-020",
+    "incident-022",
+    "incident-025",
+    "incident-029",
+    "incident-033",
+    "incident-036",
+    "incident-038",
+    "incident-040",
+    "incident-043",
+    "incident-046",
+    "incident-049",
+    "incident-052",
+    "incident-055",
+    "incident-058",
+    "incident-060"
+  ],
+  "eligible_v1_calibration": [
+    {
+      "case_id": "incident-006",
+      "category": "simple",
+      "digest": "913e0333b1dbfa0a684580de2de7fd5f5abf1f3056c1a137e72818cba3282f9a"
+    },
+    {
+      "case_id": "incident-008",
+      "category": "simple",
+      "digest": "6d4ba7ce938a6c889def3ab5bec9e5ed752fc41d51962889adc6003cb9b7238e"
+    },
+    {
+      "case_id": "incident-009",
+      "category": "simple",
+      "digest": "73e3eec0700bb8a2f4833821a6041eafb4cbeaa3552386a548e6dbf112181145"
+    },
+    {
+      "case_id": "incident-010",
+      "category": "simple",
+      "digest": "15deaa701ae07615580b7279c86d95d5f27a58e0623f364772c1b539d874b21f"
+    },
+    {
+      "case_id": "incident-012",
+      "category": "simple",
+      "digest": "90819132883ac87efba682ce7b4e88671b2ce01b7a4bb863a33a74846ddd6980"
+    },
+    {
+      "case_id": "incident-013",
+      "category": "simple",
+      "digest": "51b174f7e399a2a8e2070f27a6ed734c5a45d94b28de9791a66c5ca1877754da"
+    },
+    {
+      "case_id": "incident-015",
+      "category": "simple",
+      "digest": "bb1707010807a7fec7d818173d4a110bc76f19573a318702ff1c239f0b72ea3a"
+    },
+    {
+      "case_id": "incident-016",
+      "category": "simple",
+      "digest": "c66ea429c07b76e7b62f2cc39470e92b9cf77b46550e0c96ca14c7ee7e3bfa8c"
+    },
+    {
+      "case_id": "incident-017",
+      "category": "simple",
+      "digest": "bbb50611142757ab3ceb30eb903fbe18dbd3c0c59f2b395544f0241cd3a797d0"
+    },
+    {
+      "case_id": "incident-019",
+      "category": "simple",
+      "digest": "5a7353a8349df1eaef0d4d5848878721d83b66c9641e34aec5c801281b9bc3e4"
+    },
+    {
+      "case_id": "incident-021",
+      "category": "multi",
+      "digest": "20310d7b3cd6b65fa28685fe6d580efd15080540b85c5047ac78673d4903c7e6"
+    },
+    {
+      "case_id": "incident-023",
+      "category": "multi",
+      "digest": "f041a8d5b994107ac4ac592c99fea3d68dc62c56ef3879c3b734deff3b31d269"
+    },
+    {
+      "case_id": "incident-024",
+      "category": "multi",
+      "digest": "6766171f06a92703ebe5c250570cacbe22c1f58f85ac79416fdf1414e3bcdfc5"
+    },
+    {
+      "case_id": "incident-026",
+      "category": "multi",
+      "digest": "a55f36195d6f2af2c806300bc4755bcfd05a2cff7bf94ac35280c70f1c8c0dfa"
+    },
+    {
+      "case_id": "incident-027",
+      "category": "multi",
+      "digest": "ebc27de94aa5ebece05817152102984f96990ba5233c42c485b047e5713f78a8"
+    },
+    {
+      "case_id": "incident-028",
+      "category": "multi",
+      "digest": "3ce6e84bf55ce69fd091f1be05d1e385adc324c6d0956aca6ae774b3f018bcf6"
+    },
+    {
+      "case_id": "incident-030",
+      "category": "multi",
+      "digest": "33541b3ddf9d19603ca3629bbee91e331150c359014603631a5a98558065247e"
+    },
+    {
+      "case_id": "incident-031",
+      "category": "multi",
+      "digest": "d5491c3c7aac9da5aada439dfaebbd1399802c21af19c5ec727e5c21857d1dbc"
+    },
+    {
+      "case_id": "incident-032",
+      "category": "multi",
+      "digest": "9ebd6a422d289f80d756a1d5456db7c4f75ad00d8b17ad43446240b6bf098351"
+    },
+    {
+      "case_id": "incident-034",
+      "category": "multi",
+      "digest": "030a8d8d7dd65798911c939bd013afc851c715b318f4e1f25cc3eec572952860"
+    },
+    {
+      "case_id": "incident-035",
+      "category": "multi",
+      "digest": "e599cdbb9572f7aae075c275551027ff1c2a8519247ebd813da182bb8572b44c"
+    },
+    {
+      "case_id": "incident-037",
+      "category": "multi",
+      "digest": "1ec14134b94b85717cf5d7fe850d8c79e483094652ef41f4c66fcc2586799c8d"
+    },
+    {
+      "case_id": "incident-039",
+      "category": "multi",
+      "digest": "8a71b83ad60b53d07b89844eb55b4bd72d017aebbf4dfab9abdfb8648b855d8a"
+    },
+    {
+      "case_id": "incident-041",
+      "category": "noisy",
+      "digest": "68a8d5a5f62e45e9fadf1fe47f35fc48a3f6328398f7e7af85c895107b2eaa54"
+    },
+    {
+      "case_id": "incident-042",
+      "category": "noisy",
+      "digest": "bc644e6e9e5b5a018491b031d5ff73c770b583e90276d655256f92fbb1451ca0"
+    },
+    {
+      "case_id": "incident-044",
+      "category": "noisy",
+      "digest": "5029401220df93da460ae13e1ea0670c66edc13f236992d770638ff4eaa29a0d"
+    },
+    {
+      "case_id": "incident-045",
+      "category": "noisy",
+      "digest": "3847a0798574567ea96eed3b7e9fe6170cb5e642b3279acef02e9c2928b788e6"
+    },
+    {
+      "case_id": "incident-047",
+      "category": "noisy",
+      "digest": "0f7bc13a2666d4ab5c19e081ff697e982c21d76610e145eea9da5648a75ba225"
+    },
+    {
+      "case_id": "incident-048",
+      "category": "noisy",
+      "digest": "b57d9a41990d364fbe858ab7f40f1bbdfc4b3609e17f54f4d7c89c9b2515cba7"
+    },
+    {
+      "case_id": "incident-050",
+      "category": "noisy",
+      "digest": "976735667a10171c707c140af65bd4109bc098874686c7a6dca0b46d374b5ee0"
+    },
+    {
+      "case_id": "incident-051",
+      "category": "ambiguous",
+      "digest": "bc61534ab298360af466b14b910208ea2361a6bf5021ef974fb7124f0dd03e58"
+    },
+    {
+      "case_id": "incident-053",
+      "category": "ambiguous",
+      "digest": "424c8bca5c7445404fb25b26703e8ef164e9cd54457a0fbac0dbbc075fab4a2c"
+    },
+    {
+      "case_id": "incident-054",
+      "category": "ambiguous",
+      "digest": "3c53d185bd9769d4a51c5586ffe3250e5a2d1a223a5e9847ae515b74001572e4"
+    },
+    {
+      "case_id": "incident-056",
+      "category": "ambiguous",
+      "digest": "6c33669708f203e354bcf5f3df41ae81f33461688c98c8792ac0ba824edc40a3"
+    },
+    {
+      "case_id": "incident-057",
+      "category": "ambiguous",
+      "digest": "c8497c5dbef6402de069bfbc6524ec23a0f239e37965ea69cae5662b8954fc59"
+    },
+    {
+      "case_id": "incident-059",
+      "category": "ambiguous",
+      "digest": "c987c8dbf166be43f6d5ff3afb4ce54ec7ca67b59f4906a93487c214154a206f"
+    }
+  ],
+  "selected_final_test": [
+    "incident-034",
+    "incident-047",
+    "incident-010",
+    "incident-037",
+    "incident-021",
+    "incident-030",
+    "incident-045",
+    "incident-054",
+    "incident-028",
+    "incident-053",
+    "incident-044",
+    "incident-013",
+    "incident-019",
+    "incident-024",
+    "incident-056",
+    "incident-008",
+    "incident-009",
+    "incident-039",
+    "incident-012",
+    "incident-051"
+  ],
+  "new_split_sha256": "92e312535402fa92903c453f0c84c5799bd0dbc5449e60023d3e6259b138949d",
+  "selection_declaration": "Selection used only case_id and category for deterministic stratification; it did not read expected diagnosis, severity, required tools, acceptable tools, prohibited actions, expected escalation, model outputs, quality scores, latencies, or any other private labels or run results."
+}

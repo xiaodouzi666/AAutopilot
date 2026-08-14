@@ -2,18 +2,20 @@
 
 **Evidence status:** {% if evidence_status == "measured" %}measured ({{ measurement_count }} raw request rows){% else %}Arm64 measurement pending; fixture output is excluded from claims{% endif %}.
 
-## Headline claims
+**Frozen workload:** cases `{{ cases_sha256[:12] }}…`; split schema v{{ split_schema_version }} `{{ split_sha256[:12] }}…`.
+
+## Preregistered outcomes
 
 {% if claims %}
 {% for claim in claims %}
-- **{{ claim.metric }}:** {{ "%.3f"|format(claim.value) }}{{ claim.unit }}; 95% bootstrap interval {{ "%.3f"|format(claim.confidence_interval[0]) }} to {{ "%.3f"|format(claim.confidence_interval[1]) }}{{ claim.unit }}. {% if claim.demonstrated %}The interval excludes zero.{% else %}This is reported as no demonstrated improvement because the interval crosses zero.{% endif %}
+- **{% if claim.claim_id == primary_claim_id %}Primary{% else %}Transparent secondary{% endif %} — {{ claim.metric }}:** {{ "%.3f"|format(claim.value) }}{{ claim.unit }}; paired 95% bootstrap interval {{ "%.3f"|format(claim.confidence_interval[0]) }} to {{ "%.3f"|format(claim.confidence_interval[1]) }}{{ claim.unit }}. {% if claim.confidence_interval[0] > 0 %}The interval excludes zero on the positive side.{% elif claim.confidence_interval[1] < 0 %}The interval excludes zero on the negative side.{% else %}The interval crosses zero.{% endif %} {% if claim.claim_id == primary_claim_id %}{% if claim.demonstrated %}This preregistered primary result passes the final improvement gate.{% else %}The final improvement gate does not pass.{% endif %}{% else %}This secondary outcome is always disclosed and cannot unlock final publication.{% endif %}
   - Baseline: `{{ claim.baseline_candidate }}`
   - Optimized: `{{ claim.optimized_candidate }}`
   - Formula: `{{ claim.formula }}`
   - Source run IDs: {{ claim.source_rows|join(", ") }}
 {% endfor %}
 {% else %}
-No performance claim is available. Complete the fair same-machine Arm64 Linux generic-Q4_0/KleidiAI-Q4_0 benchmark first.
+No performance claim is available. Complete the fair same-machine Arm64 Linux generic-Q4_0/KleidiAI-Q4_0 benchmark on the frozen v2 final holdout first.
 {% endif %}
 
 ## Candidate summary
@@ -29,6 +31,17 @@ No performance claim is available. Complete the fair same-machine Arm64 Linux ge
 
 The fair Arm-specific comparison holds the target, source commit, official Q4_0 model checksum, prompt set, sampling, affinity, threads, batch, micro-batch, concurrency, and lifecycle constant. The intended variable is only the generic versus KleidiAI CPU backend. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K `output.weight`; that single fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. CPU-only proof and the primary KleidiAI Q4 marker are required, and any additional or different fallback is rejected.
 
+Split v1's test cases were executed during failed run6 and then used for error analysis, so they
+are retired from final evaluation. Before the next run, split v2 selected 20 final-holdout cases
+from the 36 never-executed candidates by a frozen stratified hash procedure whose only inputs were
+`category` and `case_id`. Only split v2 is described as the unseen final holdout; its complete
+audit manifest is `demo/split-freeze-v2.json`.
+
+Mean TTFT reduction is the prospectively registered primary outcome. P95 end-to-end latency
+reduction and median per-request throughput increase are transparent secondary outcomes. All
+three are rendered from the same 20 paired cases (40 formal A1/A2 source rows); only a positive
+primary interval whose lower bound exceeds zero can unlock final publication.
+
 The submitted API profile is strong-only. Its public boundary applies constrained triage JSON and
 fails closed when schema, read-only tool policy, safety, or consistency validation fails. A4
 weak/strong routing remains a future experiment unless calibration and the complete held-out gate
@@ -39,4 +52,6 @@ approve a measured multi-runtime profile.
 {% for limitation in limitations %}- {{ limitation }}
 {% endfor %}
 
-Generated at {{ generated_at }}. See `claims.json`, `benchmark-results.json`, and `raw/` for provenance.
+Generated at {{ generated_at }}. The repository carries the sanitized formal rows in
+`benchmark-results.json` plus `claims.json`; the attested release bundle carries the full redacted
+`raw/` capture and integrity receipts.

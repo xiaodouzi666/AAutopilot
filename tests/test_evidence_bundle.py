@@ -17,6 +17,7 @@ from a64pilot.agent.schema import (
     triage_openai_response_format,
 )
 from a64pilot.benchmark.quality import load_cases, load_split, score_case
+from a64pilot.benchmark.runner import REAL_BENCHMARK_MAX_TOKENS
 from a64pilot.benchmark.store import ArtifactStore
 from a64pilot.build.cmake import BUILD_TARGETS, COMMON_DEFINITIONS
 from a64pilot.build.llama_source import OFFICIAL_LLAMA_REPOSITORY
@@ -309,6 +310,10 @@ def _write_record(
         "run-config.json",
         {
             "candidate": candidate,
+            "dataset": {
+                "cases_sha256": sha256_file(project / "demo/cases.jsonl"),
+                "split_sha256": sha256_file(project / "demo/split.json"),
+            },
             "prompt_sha256": prompt_fingerprint(),
             "triage_schema": triage_json_schema(),
             "backend_proof": backend_proof.to_dict(),
@@ -326,7 +331,7 @@ def _write_record(
             "model": candidate_id,
             "temperature": 0.0,
             "top_p": 1.0,
-            "max_tokens": 256,
+            "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
             "seed": 20260813,
             "stream": True,
             "response_format": triage_openai_response_format(),
@@ -364,6 +369,18 @@ def _write_valid_bundle(project: Path) -> EvidenceBundle:
     source_dir.mkdir(parents=True)
     shutil.copy2(ROOT / "third_party/llama.cpp.lock", project / "third_party/llama.cpp.lock")
     write_json(artifacts / "system-info.json", _system_info())
+    write_json(
+        artifacts / "quality-dataset.json",
+        {
+            "valid": True,
+            "cases": 60,
+            "calibration": 40,
+            "held_out": 20,
+            "cases_sha256": sha256_file(demo / "cases.jsonl"),
+            "split_sha256": sha256_file(demo / "split.json"),
+            "mode": "validation-only",
+        },
+    )
     _write_build_fixture(project)
     _write_model_fixture(project)
 
@@ -603,6 +620,48 @@ def test_request_sampling_settings_tampering_is_rejected(valid_bundle: EvidenceB
     assert any("request temperature disagrees" in error for error in errors)
 
 
+def test_request_token_budget_tampering_is_rejected(valid_bundle: EvidenceBundle) -> None:
+    run_dir = valid_bundle.artifacts / "raw" / valid_bundle.first_generic_run
+    path = run_dir / "request.json"
+    payload = _load_json(path)
+    payload["max_tokens"] = 256
+    write_json(path, payload)
+    _refinalize(valid_bundle, valid_bundle.first_generic_run)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert any("request max_tokens disagrees" in error for error in errors)
+
+
+@pytest.mark.parametrize("field", ["cases_sha256", "split_sha256"])
+def test_frozen_dataset_hash_tampering_is_rejected(
+    valid_bundle: EvidenceBundle, field: str
+) -> None:
+    run_dir = valid_bundle.artifacts / "raw" / valid_bundle.first_generic_run
+    path = run_dir / "run-config.json"
+    payload = _load_json(path)
+    payload["dataset"][field] = "f" * 64
+    write_json(path, payload)
+    _refinalize(valid_bundle, valid_bundle.first_generic_run)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert any("frozen dataset hash mismatch" in error for error in errors)
+
+
+def test_quality_dataset_manifest_hash_tampering_is_rejected(
+    valid_bundle: EvidenceBundle,
+) -> None:
+    path = valid_bundle.artifacts / "quality-dataset.json"
+    payload = _load_json(path)
+    payload["split_sha256"] = "f" * 64
+    write_json(path, payload)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert "quality-dataset manifest hash mismatch" in errors
+
+
 def test_request_tampering_is_rejected_after_rehash(valid_bundle: EvidenceBundle) -> None:
     run_dir = valid_bundle.artifacts / "raw" / valid_bundle.first_generic_run
     path = run_dir / "request.json"
@@ -627,6 +686,27 @@ def test_response_tampering_is_rejected_after_rehash(valid_bundle: EvidenceBundl
     _, errors = validate_evidence_bundle(valid_bundle.artifacts)
 
     assert any("schema score disagrees with response replay" in error for error in errors)
+
+
+def test_ttft_tampering_is_rejected_after_rehash(valid_bundle: EvidenceBundle) -> None:
+    run_dir = valid_bundle.artifacts / "raw" / valid_bundle.first_generic_run
+    record_path = run_dir / "requests.jsonl"
+    record = BenchmarkRecord.model_validate_json(record_path.read_text(encoding="utf-8"))
+    record_path.write_text(
+        record.model_copy(update={"ttft_ms": 1.0}).model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+    response_path = run_dir / "response.json"
+    response = _load_json(response_path)
+    timing = response["timing"]
+    assert isinstance(timing, dict)
+    timing["ttft_ms"] = 1.0
+    write_json(response_path, response)
+    _refinalize(valid_bundle, valid_bundle.first_generic_run)
+
+    _, errors = validate_evidence_bundle(valid_bundle.artifacts)
+
+    assert any("ttft_ms does not match monotonic timestamps" in error for error in errors)
 
 
 def test_duplicate_run_id_is_rejected(valid_bundle: EvidenceBundle) -> None:

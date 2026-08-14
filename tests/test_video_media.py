@@ -116,6 +116,41 @@ def test_draft_media_allows_pending_only_with_watermark_policy(
     assert all("%" not in line for slide in slides for line in slide.lines if line[:1].isdigit())
 
 
+def test_final_claim_slide_labels_primary_and_paired_row_count(
+    tmp_path: Path,
+    media: ModuleType,
+) -> None:
+    source_run_id = "a" * 32
+    source_rows = [source_run_id, *(f"source-{index:02d}" for index in range(39))]
+    claim = {
+        "claim_id": media.PRIMARY_CLAIM_ID,
+        "metric": "Q4_0 mean time-to-first-token reduction",
+        "value": 3.0,
+        "unit": "%",
+        "confidence_interval": [1.0, 5.0],
+        "demonstrated": True,
+        "source_rows": source_rows,
+    }
+    report = {
+        "evidence_status": "measured",
+        "claims": [claim],
+        "system": {
+            "architecture": "aarch64",
+            "operating_system": "Linux",
+            "kernel": "6.11.0-arm64",
+        },
+    }
+    write_target_receipt(tmp_path, source_run_id=source_run_id)
+    assets = tmp_path / "assets" / "submission"
+    assets.mkdir(parents=True)
+    (assets / media.THUMBNAIL_NAME).write_bytes(b"png")
+
+    slides = media.build_slides(root=tmp_path, report=report, claims=[claim], draft=False)
+    claim_slide = next(slide for slide in slides if slide.title == claim["metric"])
+    assert "PRIMARY • 20 paired cases • 40 formal source rows" in claim_slide.lines
+    assert "only this outcome can unlock final publication" in claim_slide.lines
+
+
 def test_linux_narration_uses_offline_espeak_ng(
     tmp_path: Path,
     media: ModuleType,
@@ -211,8 +246,8 @@ def test_measured_claims_must_match_report_and_have_sources(
     for name in media.REPORT_FIGURES:
         (figures / name).write_bytes(b"png")
     claim = {
-        "claim_id": "fair_q4_0_p95_latency_reduction",
-        "metric": "Q4_0 p95 end-to-end latency reduction",
+        "claim_id": media.PRIMARY_CLAIM_ID,
+        "metric": "Q4_0 mean time-to-first-token reduction",
         "value": 12.5,
         "unit": "%",
         "source_rows": ["generic-incident-001", "kleidiai-incident-001"],
@@ -253,18 +288,52 @@ def test_final_media_requires_a_demonstrated_positive_claim(
     for name in media.REPORT_FIGURES:
         (figures / name).write_bytes(b"png")
     claim = {
-        "claim_id": "fair_q4_0_p95_latency_reduction",
-        "metric": "Q4_0 p95 end-to-end latency reduction",
+        "claim_id": media.PRIMARY_CLAIM_ID,
+        "metric": "Q4_0 mean time-to-first-token reduction",
         "value": 1.0,
         "unit": "%",
         "source_rows": ["generic", "kleidiai"],
         "confidence_interval": [-1.0, 3.0],
         "demonstrated": False,
     }
-    with pytest.raises(media.MediaNotReady, match="no positive headline improvement"):
+    with pytest.raises(media.MediaNotReady, match="primary mean-TTFT claim"):
         media.validate_evidence(
             report={"evidence_status": "measured", "claims": [claim]},
             claims=[claim],
+            artifacts=artifacts,
+            draft=False,
+        )
+
+
+def test_positive_secondary_cannot_unlock_final_media(
+    tmp_path: Path,
+    media: ModuleType,
+) -> None:
+    artifacts = tmp_path / "artifacts"
+    figures = artifacts / "figures"
+    figures.mkdir(parents=True)
+    for name in media.REPORT_FIGURES:
+        (figures / name).write_bytes(b"png")
+    primary = {
+        "claim_id": media.PRIMARY_CLAIM_ID,
+        "metric": "Q4_0 mean time-to-first-token reduction",
+        "value": 1.0,
+        "unit": "%",
+        "source_rows": ["generic", "kleidiai"],
+        "confidence_interval": [-1.0, 3.0],
+        "demonstrated": False,
+    }
+    secondary = {
+        **primary,
+        "claim_id": "fair_q4_0_p95_latency_reduction",
+        "metric": "Q4_0 p95 end-to-end latency reduction",
+        "confidence_interval": [1.0, 3.0],
+        "demonstrated": True,
+    }
+    with pytest.raises(media.MediaNotReady, match="primary mean-TTFT claim"):
+        media.validate_evidence(
+            report={"evidence_status": "measured", "claims": [primary, secondary]},
+            claims=[primary, secondary],
             artifacts=artifacts,
             draft=False,
         )
@@ -283,8 +352,8 @@ def test_final_media_recomputes_claims_from_raw_gate(
     generic_run_id = "e" * 32
     kleidiai_run_id = "f" * 32
     claim = {
-        "claim_id": "fair_q4_0_p95_latency_reduction",
-        "metric": "Q4_0 p95 end-to-end latency reduction",
+        "claim_id": media.PRIMARY_CLAIM_ID,
+        "metric": "Q4_0 mean time-to-first-token reduction",
         "value": 12.5,
         "unit": "%",
         "source_rows": [generic_run_id, kleidiai_run_id],

@@ -13,7 +13,11 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 from a64pilot.benchmark.statistics import summarize
 from a64pilot.benchmark.store import ArtifactStore
 from a64pilot.provenance import sha256_file, write_json
-from a64pilot.report.claims import generate_claims, verify_claim_held_out_coverage
+from a64pilot.report.claims import (
+    PRIMARY_CLAIM_ID,
+    generate_claims,
+    verify_claim_held_out_coverage,
+)
 from a64pilot.report.figures import render_ablation, render_pareto
 from a64pilot.report.integrity import validate_evidence_bundle, verify_claim_sources
 from a64pilot.schemas import BenchmarkRecord
@@ -23,6 +27,21 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _workload_provenance(root: Path) -> dict[str, str]:
+    """Fingerprint the exact public cases and split used for this report."""
+
+    cases_path = root / "demo" / "cases.jsonl"
+    split_path = root / "demo" / "split.json"
+    split = _load_json(split_path)
+    if not isinstance(split, dict) or not isinstance(split.get("schema_version"), str):
+        raise ValueError(f"split manifest has no schema_version: {split_path}")
+    return {
+        "cases_sha256": sha256_file(cases_path),
+        "split_sha256": sha256_file(split_path),
+        "split_schema_version": split["schema_version"],
+    }
 
 
 def _summaries(records: list[BenchmarkRecord]) -> list[dict[str, Any]]:
@@ -84,6 +103,7 @@ def render_report(
     system = _load_json(artifacts / "system-info.json")
     build = _load_json(artifacts / "build-manifest.json")
     models = _load_json(artifacts / "model-manifest.json")
+    workload_provenance = _workload_provenance(root)
 
     figures = artifacts / "figures"
     ablation_path = render_ablation(measured, figures / "ablation.png")
@@ -116,6 +136,8 @@ def render_report(
         "system": system,
         "build": build,
         "models": models,
+        **workload_provenance,
+        "primary_claim_id": PRIMARY_CLAIM_ID,
         "claims": [claim.model_dump(mode="json") for claim in claims],
         "summaries": summaries,
         "limitations": [

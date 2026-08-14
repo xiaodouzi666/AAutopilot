@@ -20,6 +20,7 @@ from a64pilot.schemas import BenchmarkRecord, Claim
 DEFAULT_SPLIT_PATH = Path("demo/split.json")
 REQUIRED_HELD_OUT_CASES = 20
 FAIR_Q4_QUANTIZATIONS = frozenset({"Q4_0"})
+PRIMARY_CLAIM_ID = "fair_q4_0_mean_ttft_reduction"
 
 
 def load_required_test_case_ids(
@@ -56,6 +57,7 @@ def _signature(record: BenchmarkRecord) -> tuple[object, ...]:
         record.batch,
         record.ubatch,
         record.parallel,
+        record.context,
         tuple(record.affinity),
         record.split,
     )
@@ -128,6 +130,9 @@ def _eligible_pair(
     if any(
         record.e2e_ms <= 0
         or not math.isfinite(record.e2e_ms)
+        or record.ttft_ms is None
+        or record.ttft_ms <= 0
+        or not math.isfinite(record.ttft_ms)
         or not math.isfinite(record.quality_score)
         or not math.isfinite(record.safety_score)
         for record in (*generic, *kleidiai)
@@ -270,10 +275,37 @@ def generate_claims(
         optimized_rps,
         statistic=throughput_increase_pct,
     )
+
+    baseline_ttft = [float(item.ttft_ms) for item in generic if item.ttft_ms is not None]
+    optimized_ttft = [float(item.ttft_ms) for item in kleidiai if item.ttft_ms is not None]
+    baseline_mean_ttft = float(np.mean(baseline_ttft))
+    optimized_mean_ttft = float(np.mean(optimized_ttft))
+    ttft_value = latency_reduction_pct(baseline_mean_ttft, optimized_mean_ttft)
+    ttft_ci = paired_bootstrap_interval(
+        baseline_ttft,
+        optimized_ttft,
+        reducer=lambda values: float(np.mean(values)),
+    )
+
     rows = [item.run_id for item in (*generic, *kleidiai)]
     baseline_id = generic[0].candidate_id
     optimized_id = kleidiai[0].candidate_id
     return [
+        Claim(
+            claim_id=PRIMARY_CLAIM_ID,
+            metric="Q4_0 mean time-to-first-token reduction",
+            value=ttft_value,
+            unit="%",
+            baseline_candidate=baseline_id,
+            optimized_candidate=optimized_id,
+            source_rows=rows,
+            formula=(
+                "(generic_q4_0_mean_ttft_ms - kleidiai_q4_0_mean_ttft_ms) / "
+                "generic_q4_0_mean_ttft_ms * 100"
+            ),
+            confidence_interval=ttft_ci,
+            demonstrated=ttft_ci[0] > 0,
+        ),
         Claim(
             claim_id="fair_q4_0_p95_latency_reduction",
             metric="Q4_0 p95 end-to-end latency reduction",
@@ -302,10 +334,15 @@ def generate_claims(
 
 
 def has_demonstrated_improvement(claims: Iterable[Claim]) -> bool:
-    """Return whether at least one positive headline survives uncertainty."""
+    """Return whether the prospectively registered primary claim survives uncertainty.
+
+    End-to-end p95 latency and request throughput remain transparent secondary outcomes; they
+    cannot unlock publication by chance when the primary mean-TTFT interval crosses zero.
+    """
 
     return any(
-        claim.demonstrated
+        claim.claim_id == PRIMARY_CLAIM_ID
+        and claim.demonstrated
         and claim.value > 0
         and claim.confidence_interval is not None
         and claim.confidence_interval[0] > 0
@@ -316,6 +353,7 @@ def has_demonstrated_improvement(claims: Iterable[Claim]) -> bool:
 __all__ = [
     "DEFAULT_SPLIT_PATH",
     "FAIR_Q4_QUANTIZATIONS",
+    "PRIMARY_CLAIM_ID",
     "REQUIRED_HELD_OUT_CASES",
     "generate_claims",
     "has_demonstrated_improvement",

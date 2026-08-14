@@ -10,11 +10,12 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = "1.0"
+SPLIT_SCHEMA_VERSION = "2.0"
 
 
 class Severity(StrEnum):
@@ -66,18 +67,98 @@ class Hypothesis(StrictModel):
         return values
 
 
+FixtureIdentifier: TypeAlias = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+    ),
+]
+
+
+class InspectServiceArguments(StrictModel):
+    service: FixtureIdentifier
+
+
+class ReadLogsArguments(StrictModel):
+    service: FixtureIdentifier
+    limit: int = Field(default=100, ge=1, le=200)
+
+
+class CheckDiskArguments(StrictModel):
+    mount: Literal["/", "/var", "/tmp", "/srv"] = "/"
+
+
+class CheckMemoryArguments(StrictModel):
+    scope: FixtureIdentifier = "node"
+
+
+class CheckNetworkArguments(StrictModel):
+    target: FixtureIdentifier
+    port: int = Field(default=443, ge=1, le=65535)
+
+
+class EscalateArguments(StrictModel):
+    reason: str = Field(min_length=1, max_length=240)
+
+
 class ToolCall(StrictModel):
+    """Compatibility base for callers; response parsing uses the strict variants below."""
+
     name: ToolName
     arguments: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("arguments")
     @classmethod
-    def arguments_must_be_json_compatible(cls, value: dict[str, Any]) -> dict[str, Any]:
+    def arguments_must_be_json_compatible(cls, value: Any) -> Any:
+        payload = value.model_dump(mode="json") if isinstance(value, BaseModel) else value
         try:
-            json.dumps(value, allow_nan=False)
+            json.dumps(payload, allow_nan=False)
         except (TypeError, ValueError) as exc:
             raise ValueError("tool arguments must be finite JSON values") from exc
         return value
+
+
+class InspectServiceToolCall(ToolCall):
+    name: Literal[ToolName.INSPECT_SERVICE]
+    arguments: InspectServiceArguments
+
+
+class ReadLogsToolCall(ToolCall):
+    name: Literal[ToolName.READ_LOGS]
+    arguments: ReadLogsArguments
+
+
+class CheckDiskToolCall(ToolCall):
+    name: Literal[ToolName.CHECK_DISK]
+    arguments: CheckDiskArguments
+
+
+class CheckMemoryToolCall(ToolCall):
+    name: Literal[ToolName.CHECK_MEMORY]
+    arguments: CheckMemoryArguments
+
+
+class CheckNetworkToolCall(ToolCall):
+    name: Literal[ToolName.CHECK_NETWORK]
+    arguments: CheckNetworkArguments
+
+
+class EscalateToolCall(ToolCall):
+    name: Literal[ToolName.ESCALATE]
+    arguments: EscalateArguments
+
+
+ToolCallVariant: TypeAlias = Annotated[
+    InspectServiceToolCall
+    | ReadLogsToolCall
+    | CheckDiskToolCall
+    | CheckMemoryToolCall
+    | CheckNetworkToolCall
+    | EscalateToolCall,
+    Field(discriminator="name"),
+]
 
 
 class TriageResponse(StrictModel):
@@ -87,7 +168,7 @@ class TriageResponse(StrictModel):
     severity: Severity
     diagnosis: DiagnosisCategory
     hypotheses: list[Hypothesis] = Field(min_length=1, max_length=6)
-    tool_calls: list[ToolCall] = Field(min_length=1, max_length=8)
+    tool_calls: list[ToolCallVariant] = Field(min_length=1, max_length=8)
     safe_next_action: str = Field(min_length=1, max_length=500)
     needs_escalation: bool
 
@@ -135,7 +216,7 @@ class RoutingInput(StrictModel):
 
 
 class SplitManifest(StrictModel):
-    schema_version: str = SCHEMA_VERSION
+    schema_version: Literal["2.0"] = SPLIT_SCHEMA_VERSION
     seed: int
     calibration: tuple[str, ...]
     test: tuple[str, ...]
@@ -218,16 +299,31 @@ Diagnosis = DiagnosisCategory
 __all__ = [
     "AgentResponse",
     "CaseCategory",
+    "CheckDiskArguments",
+    "CheckDiskToolCall",
+    "CheckMemoryArguments",
+    "CheckMemoryToolCall",
+    "CheckNetworkArguments",
+    "CheckNetworkToolCall",
     "Diagnosis",
     "DiagnosisCategory",
+    "EscalateArguments",
+    "EscalateToolCall",
+    "FixtureIdentifier",
     "Hypothesis",
     "IncidentCase",
     "IncidentTriageResponse",
+    "InspectServiceArguments",
+    "InspectServiceToolCall",
+    "ReadLogsArguments",
+    "ReadLogsToolCall",
     "RoutingInput",
     "SCHEMA_VERSION",
     "Severity",
+    "SPLIT_SCHEMA_VERSION",
     "SplitManifest",
     "ToolCall",
+    "ToolCallVariant",
     "ToolName",
     "TriageResponse",
     "parse_incident_case",

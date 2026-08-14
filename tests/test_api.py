@@ -196,8 +196,18 @@ async def test_debug_metadata_is_omitted_without_opt_in(fixture_client: httpx.As
         ("disk full", "check_disk", {"mount": "/srv"}, False),
         ("memory OOM", "check_memory", {"scope": "node"}, False),
         ("service crash", "inspect_service", {"service": "fixture-service"}, False),
-        ("network DNS", "check_network", {"target": "fixture-service"}, False),
-        ("upstream dependency", "read_logs", {"service": "fixture-service"}, False),
+        (
+            "network DNS",
+            "check_network",
+            {"target": "fixture-service", "port": 443},
+            False,
+        ),
+        (
+            "upstream dependency",
+            "read_logs",
+            {"service": "fixture-service", "limit": 100},
+            False,
+        ),
         ("ambiguous incident", "escalate", {"reason": "insufficient evidence"}, True),
     ],
 )

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from a64pilot.report.claims import (
+    PRIMARY_CLAIM_ID,
     REQUIRED_HELD_OUT_CASES,
     generate_claims,
     has_demonstrated_improvement,
@@ -88,7 +89,7 @@ def complete_pair(*, repetitions: int = 1) -> list[BenchmarkRecord]:
                         True,
                         case_id=case_id,
                         repetition=repetition,
-                    ),
+                    ).model_copy(update={"ttft_ms": 0.8}),
                 ]
             )
     return records
@@ -102,11 +103,31 @@ def test_fixed_formal_split_has_exactly_twenty_unique_test_cases() -> None:
 def test_claims_require_complete_fair_measured_held_out_pair() -> None:
     records = complete_pair()
     claims = generate_claims(records, split_path=SPLIT_PATH)
-    assert len(claims) == 2
-    assert claims[0].value == pytest.approx(20)
-    assert len(claims[0].source_rows) == 40
+    assert len(claims) == 3
+    assert claims[0].claim_id == PRIMARY_CLAIM_ID
+    assert all(len(claim.source_rows) == 40 for claim in claims)
     assert verify_claim_sources(claims, records) == []
     assert verify_claim_held_out_coverage(claims, records, split_path=SPLIT_PATH) == []
+
+
+def test_mean_ttft_claim_uses_complete_case_paired_rows() -> None:
+    records = complete_pair()
+    records = [
+        record.model_copy(
+            update={
+                "ttft_ms": (100.0 + index // 2) * (0.8 if record.backend == "kleidiai" else 1.0)
+            }
+        )
+        for index, record in enumerate(records)
+    ]
+    claims = generate_claims(records, split_path=SPLIT_PATH)
+    ttft = next(claim for claim in claims if claim.claim_id == "fair_q4_0_mean_ttft_reduction")
+    assert ttft.value > 0
+    assert ttft.confidence_interval is not None
+    assert ttft.confidence_interval[0] > 0
+    assert ttft.demonstrated
+    assert ttft.value == pytest.approx(20.0)
+    assert len(ttft.source_rows) == 40
 
 
 def test_single_case_smoke_never_generates_headline_claim() -> None:
@@ -123,7 +144,7 @@ def test_micro_smoke_rows_do_not_contaminate_later_complete_formal_pair() -> Non
         row("smoke-k", "kleidiai", "kleidiai", 80, True, split="micro"),
     ]
     claims = generate_claims([*smoke, *complete_pair()], split_path=SPLIT_PATH)
-    assert len(claims) == 2
+    assert len(claims) == 3
     assert all("smoke" not in run_id for claim in claims for run_id in claim.source_rows)
 
 
@@ -161,8 +182,8 @@ def test_missing_case_on_either_backend_prevents_claim() -> None:
 def test_pairing_uses_case_and_repetition_not_run_id_order() -> None:
     records = complete_pair(repetitions=2)
     claims = generate_claims(list(reversed(records)), split_path=SPLIT_PATH)
-    assert claims[0].value == pytest.approx(20)
-    assert len(claims[0].source_rows) == 80
+    assert claims[0].claim_id == PRIMARY_CLAIM_ID
+    assert all(len(claim.source_rows) == 80 for claim in claims)
 
 
 def test_nonuniform_or_duplicate_repetitions_prevent_claim() -> None:
@@ -189,6 +210,13 @@ def test_nonpositive_latency_prevents_claim() -> None:
     assert generate_claims(records, split_path=SPLIT_PATH) == []
 
 
+@pytest.mark.parametrize("ttft_ms", [None, 0.0, float("inf")])
+def test_missing_or_nonfinite_ttft_prevents_formal_claims(ttft_ms: float | None) -> None:
+    records = complete_pair()
+    records[0] = records[0].model_copy(update={"ttft_ms": ttft_ms})
+    assert generate_claims(records, split_path=SPLIT_PATH) == []
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -196,6 +224,7 @@ def test_nonpositive_latency_prevents_claim() -> None:
         ("model_file_sha256", "b" * 64),
         ("threads", 8),
         ("batch", 256),
+        ("context", 4096),
         ("parallel", 2),
         ("affinity", [0, 1]),
     ],
@@ -232,7 +261,7 @@ def test_coverage_verifier_rejects_tampered_partial_claim_sources() -> None:
         claim.model_copy(update={"source_rows": claim.source_rows[:-2]}) for claim in claims
     ]
     errors = verify_claim_held_out_coverage(tampered, records, split_path=SPLIT_PATH)
-    assert len(errors) == 2
+    assert len(errors) == 3
     assert all("20-case held-out pair" in error for error in errors)
 
 
@@ -258,3 +287,12 @@ def test_submission_winner_requires_positive_interval() -> None:
         for claim in winning
     ]
     assert not has_demonstrated_improvement(inconclusive)
+
+    secondary_only = [
+        claim.model_copy(update={"demonstrated": False, "confidence_interval": (-1.0, 2.0)})
+        if claim.claim_id == PRIMARY_CLAIM_ID
+        else claim
+        for claim in winning
+    ]
+    assert any(claim.demonstrated for claim in secondary_only if claim.claim_id != PRIMARY_CLAIM_ID)
+    assert not has_demonstrated_improvement(secondary_only)

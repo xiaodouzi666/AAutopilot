@@ -79,6 +79,7 @@ def validate_evidence_bundle(
     from a64pilot.agent.prompt import build_messages, prompt_fingerprint
     from a64pilot.agent.schema import triage_json_schema
     from a64pilot.benchmark.quality import load_cases, load_split, score_case, validate_dataset
+    from a64pilot.benchmark.runner import REAL_BENCHMARK_MAX_TOKENS
     from a64pilot.benchmark.store import ArtifactStore
     from a64pilot.build.cmake import BUILD_TARGETS, COMMON_DEFINITIONS
     from a64pilot.build.llama_source import (
@@ -110,6 +111,7 @@ def validate_evidence_bundle(
     system_payload = load(artifacts / "system-info.json")
     build_payload = load(artifacts / "build-manifest.json")
     model_payload = load(artifacts / "model-manifest.json")
+    quality_dataset_payload = load(artifacts / "quality-dataset.json")
     system = None
     build = None
     models = None
@@ -359,14 +361,26 @@ def validate_evidence_bundle(
     model_by_hash = {model.sha256: model for model in models.models} if models is not None else {}
 
     try:
-        cases = load_cases(project_root / "demo/cases.jsonl")
-        split = load_split(project_root / "demo/split.json")
+        cases_path = project_root / "demo/cases.jsonl"
+        split_path = project_root / "demo/split.json"
+        cases = load_cases(cases_path)
+        split = load_split(split_path)
         validate_dataset(cases, split)
         cases_by_id = {case.case_id: case for case in cases}
+        expected_dataset_hashes = {
+            "cases_sha256": sha256_file(cases_path),
+            "split_sha256": sha256_file(split_path),
+        }
+        if not isinstance(quality_dataset_payload, dict) or any(
+            quality_dataset_payload.get(key) != value
+            for key, value in expected_dataset_hashes.items()
+        ):
+            errors.append("quality-dataset manifest hash mismatch")
     except Exception as exc:
         errors.append(f"quality dataset: {type(exc).__name__}")
         split = None
         cases_by_id = {}
+        expected_dataset_hashes = None
 
     for record in records:
         prefix = f"raw {record.run_id}:"
@@ -417,6 +431,10 @@ def validate_evidence_bundle(
             errors.append(f"{prefix} prompt fingerprint mismatch")
         if config_payload.get("triage_schema") != triage_json_schema():
             errors.append(f"{prefix} response schema fingerprint mismatch")
+        if expected_dataset_hashes is not None and config_payload.get("dataset") != (
+            expected_dataset_hashes
+        ):
+            errors.append(f"{prefix} frozen dataset hash mismatch")
 
         stage_alias = {
             "a0": "reference",
@@ -564,7 +582,7 @@ def validate_evidence_bundle(
             fixed_request_settings = {
                 "temperature": 0.0,
                 "top_p": 1.0,
-                "max_tokens": 256,
+                "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
                 "seed": 20260813,
                 "stream": True,
             }
@@ -604,6 +622,13 @@ def validate_evidence_bundle(
         derived_e2e_ms = (record.end_ns - record.start_ns) / 1_000_000
         if abs(derived_e2e_ms - record.e2e_ms) > 1.0:
             errors.append(f"{prefix} e2e_ms does not match monotonic timestamps")
+        if record.first_token_ns is None:
+            if record.ttft_ms is not None:
+                errors.append(f"{prefix} ttft_ms exists without a first-token timestamp")
+        else:
+            derived_ttft_ms = (record.first_token_ns - record.start_ns) / 1_000_000
+            if record.ttft_ms is None or abs(derived_ttft_ms - record.ttft_ms) > 1e-6:
+                errors.append(f"{prefix} ttft_ms does not match monotonic timestamps")
     return records, errors
 
 

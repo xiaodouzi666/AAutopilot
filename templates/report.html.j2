@@ -56,19 +56,20 @@
     <div class="status">
       <strong>{% if evidence_status == 'measured' %}MEASURED EVIDENCE{% else %}ARM64 MEASUREMENT PENDING{% endif %}</strong>
       <p>{% if evidence_status == 'measured' %}{{ measurement_count }} measured request rows passed provenance checks.{% else %}No performance number is published until the fair generic/KleidiAI run finishes on Arm64 Linux. {{ fixture_count }} fixture rows remain excluded.{% endif %}</p>
+      <p>Cases <code>{{ cases_sha256[:12] }}…</code><br>Split v{{ split_schema_version }} <code>{{ split_sha256[:12] }}…</code></p>
     </div>
   </header>
 
   <section class="grid">
     {% if claims %}
       {% for claim in claims %}
-      <article class="card"><div class="metric">{{ '%.2f'|format(claim.value) }}{{ claim.unit }}<small>{{ claim.metric }}</small></div><p>{% if claim.demonstrated %}Demonstrated; interval excludes zero.{% else %}No demonstrated improvement; interval crosses zero.{% endif %}</p></article>
+      <article class="card"><div class="metric">{{ '%.2f'|format(claim.value) }}{{ claim.unit }}<small>{% if claim.claim_id == primary_claim_id %}PRIMARY — {% else %}SECONDARY — {% endif %}{{ claim.metric }}</small></div><p>{% if claim.confidence_interval[0] > 0 %}Interval excludes zero on the positive side.{% elif claim.confidence_interval[1] < 0 %}Interval excludes zero on the negative side.{% else %}Interval crosses zero.{% endif %} {% if claim.claim_id == primary_claim_id %}{% if claim.demonstrated %}The preregistered final gate passes.{% else %}The final gate does not pass.{% endif %}{% else %}Disclosed transparently; never unlocks final publication.{% endif %}</p></article>
       {% endfor %}
     {% else %}
       <article class="card"><div class="metric">0<small>fabricated benchmark claims</small></div><p>The report fails closed when target evidence is absent.</p></article>
     {% endif %}
     <article class="card"><div class="metric">100%<small>required safety floor</small></div><p>The submitted strong-only proxy validates schema, read-only tool policy, safety, and consistency; invalid output fails closed with HTTP 502.</p></article>
-    <article class="card"><div class="metric">40 / 20<small>calibration / held-out cases</small></div><p>Tuning decisions freeze before final labels are evaluated. A4 routing remains a future experiment unless its gate passes.</p></article>
+    <article class="card"><div class="metric">40 / 20<small>calibration / v2 final-holdout cases</small></div><p>Split v2 was frozen from 36 never-executed candidates using only category and case ID. A4 routing remains a future experiment unless its gate passes.</p></article>
   </section>
 
   <section id="candidates"><h2>Measured candidates</h2>
@@ -78,7 +79,7 @@
   </section>
 
   <section id="figures" class="grid" style="margin-top:28px"><article class="card wide"><img class="figure" src="figures/ablation.png" alt="Ablation stages"></article><article class="card wide"><img class="figure" src="figures/pareto.png" alt="Quality latency Pareto candidates"></article></section>
-  <section id="evidence"><h2>Evidence contract</h2><p>The primary Arm claim compares the same Q4_0 model checksum, prompts, sampling, runtime settings, CPU affinity, and machine. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K <code>output.weight</code>; that fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. The primary KleidiAI Q4 marker is required and any additional or different fallback is rejected. The intended change is only the generic versus KleidiAI backend. Every claim cites raw run IDs and an explicit formula; fixture output can never support a claim.</p></section>
+  <section id="evidence"><h2>Evidence contract</h2><p>The primary Arm claim compares the same Q4_0 model checksum, prompts, sampling, runtime settings, CPU affinity, and machine. The exact pinned strong-model inventory contains 197 Q4_0 tensors and one disclosed Q6_K <code>output.weight</code>; that fallback is allowed only when SHA-256, size, and the full GGUF header inventory match. The primary KleidiAI Q4 marker is required and any additional or different fallback is rejected. The intended change is only the generic versus KleidiAI backend. Every report claim retains its raw run IDs and explicit formula; fixture output can never support a claim.</p><p>Split v1's test cases were executed during failed run6 and used for error analysis, so they are retired from final evaluation. Before the next run, split v2 selected 20 cases from 36 never-executed candidates with a frozen stratified hash using only category and case ID. Only v2 is described as the unseen final holdout; <code>demo/split-freeze-v2.json</code> preserves the audit trail.</p><p>Mean TTFT reduction is the prospectively registered primary outcome. P95 end-to-end latency reduction and median per-request throughput increase are transparent secondary outcomes. All three use the same 20 paired cases and 40 formal A1/A2 source rows. Only a positive primary interval with a lower bound above zero unlocks final publication.</p><p>The repository carries sanitized formal rows and <code>claims.json</code>; the attested release bundle carries the full redacted raw capture and integrity receipts.</p></section>
   <section id="limitations"><h2>Limitations</h2><ul>{% for limitation in limitations %}<li>{{ limitation }}</li>{% endfor %}</ul></section>
   <footer>Generated {{ generated_at }} from local artifacts. This file loads no external network resources.</footer>
 </main></body></html>

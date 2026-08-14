@@ -24,7 +24,7 @@ benchmark:
   repetitions: 3
   max_search_minutes: 120
   random_seed: 20260813
-  max_output_tokens: 192
+  max_output_tokens: 512
   temperature: 0.0
 
 quality_gate:
