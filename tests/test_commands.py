@@ -223,7 +223,7 @@ def test_kleidiai_load_proof_poll_waits_for_both_async_markers() -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        def log_tail(self, _lines: int) -> str:
+        def log_text(self) -> str:
             self.calls += 1
             return "kleidiai: primary q4 kernel feature DOTPROD" if self.calls == 1 else complete
 
@@ -247,7 +247,7 @@ def test_kleidiai_load_proof_poll_never_accepts_warning_only() -> None:
     )
 
     class WarningOnly:
-        def log_tail(self, _lines: int) -> str:
+        def log_text(self) -> str:
             return warning
 
     _, proof = _wait_for_kleidiai_load_proof(  # type: ignore[arg-type]

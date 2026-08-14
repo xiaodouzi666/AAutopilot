@@ -392,6 +392,28 @@ class LlamaServerProcess:
             chunks.append(f"[{label}]\n" + "\n".join(content[-lines:]))
         return "\n".join(chunks)
 
+    def log_text(self) -> str:
+        """Return the complete stdout/stderr evidence for this process.
+
+        Backend initialization markers are emitted only once.  Long, verbose
+        inference sessions can push them out of any fixed-size tail, so strict
+        benchmark and deployment verification must use this complete snapshot.
+        """
+
+        chunks: list[str] = []
+        if self._artifacts is None:
+            return ""
+        for label, path in (
+            ("stdout", self._artifacts.stdout_log),
+            ("stderr", self._artifacts.stderr_log),
+        ):
+            try:
+                content = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            chunks.append(f"[{label}]\n{content}")
+        return "\n".join(chunks)
+
     def snapshot(self) -> ProcessSnapshot:
         process = self._process
         returncode = process.poll() if process is not None else None

@@ -200,6 +200,24 @@ def test_process_readiness_logs_rss_and_cleanup(fake_binary: Path, tmp_path: Pat
     assert os.path.basename(command_record["argv"][0]) == "fake llama-server"
 
 
+def test_complete_log_snapshot_survives_tail_rollover(fake_binary: Path, tmp_path: Path) -> None:
+    manager = LlamaServerProcess(
+        make_config(fake_binary, tmp_path),
+        log_dir=tmp_path / "logs",
+        startup_timeout_s=5,
+    )
+    with manager:
+        assert manager.ready
+    marker = "kleidiai: primary q4 kernel feature DOTPROD"
+    manager.artifacts.stderr_log.write_text(
+        marker + "\n" + "\n".join(f"debug line {index}" for index in range(4000)) + "\n",
+        encoding="utf-8",
+    )
+
+    assert marker not in manager.log_tail(3000)
+    assert marker in manager.log_text()
+
+
 def test_exception_inside_context_still_stops_process(fake_binary: Path, tmp_path: Path) -> None:
     manager = LlamaServerProcess(
         make_config(fake_binary, tmp_path),

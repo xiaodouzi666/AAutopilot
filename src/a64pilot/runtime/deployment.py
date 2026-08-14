@@ -293,7 +293,7 @@ def serve_measured_profile(
             if not reviewed_model.verified:
                 raise DeploymentProfileError("; ".join(reviewed_model.errors))
         manager.start()
-        log_text = manager.log_tail(3000)
+        log_text = manager.log_text()
         backend_proof = verify_backend_log(
             log_text,
             BuildVariant(profile.backend),

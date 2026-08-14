@@ -62,7 +62,7 @@ def _wait_for_kleidiai_load_proof(
         raise ValueError("load-proof timeout must be non-negative and interval positive")
     deadline = time.monotonic() + timeout_s
     while True:
-        log_text = manager.log_tail(3000)
+        log_text = manager.log_text()
         proof = verify_backend_log(
             log_text,
             BuildVariant.KLEIDIAI,
@@ -215,7 +215,7 @@ class RealServiceBenchmark:
                     reviewed_model=reviewed_model,
                 )
             else:
-                log_text = manager.log_tail(3000)
+                log_text = manager.log_text()
                 backend_proof = verify_backend_log(log_text, expected)
             cache_text = candidate.cmake_cache.read_text(encoding="utf-8", errors="replace")
             cpu_proof = verify_cpu_only(
@@ -241,7 +241,7 @@ class RealServiceBenchmark:
                         response_format=response_format,
                     )
                     if candidate.backend == "kleidiai" and not runtime_marker_recorded:
-                        post_request_log = manager.log_tail(3000)
+                        post_request_log = manager.log_text()
                         post_request_backend = verify_backend_log(
                             post_request_log,
                             expected,
@@ -279,7 +279,7 @@ class RealServiceBenchmark:
                         completion_tokens = completion.completion_tokens or 0
                         generation_rate = completion.generation_tokens_per_second
                         run_id = uuid4().hex
-                        run_log_text = manager.log_tail(3000)
+                        run_log_text = manager.log_text()
                         run_backend_proof = verify_backend_log(
                             run_log_text,
                             expected,
