@@ -454,7 +454,7 @@ def validate_evidence_bundle(
             (("--ctx-size", "-c"), record.context),
             (("--parallel", "-np"), record.parallel),
             (("--seed",), 20260813),
-            (("-lv", "--verbosity", "--log-verbosity"), 4),
+            (("-lv", "--verbosity", "--log-verbosity"), 5),
             (("--host",), "127.0.0.1"),
         )
         for option_names, expected in command_settings:

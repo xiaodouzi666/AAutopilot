@@ -115,7 +115,10 @@ class LlamaServerConfig:
     context_size: int = 2048
     parallel: int = 1
     seed: int = 20260813
-    log_verbosity: int = 4
+    # Trace the one-time KleidiAI kernel selection that llama.cpp performs
+    # inside its default fit preflight.  That preflight demotes INFO records to
+    # DEBUG, so level 5 is required to retain the proof in the server log.
+    log_verbosity: int = 5
     cpu_only: bool = True
     enable_metrics: bool = True
     disable_webui: bool = True

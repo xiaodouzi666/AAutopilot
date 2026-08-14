@@ -199,7 +199,7 @@ def _command(backend: str, model_filename: str) -> list[str]:
         "--seed",
         "20260813",
         "-lv",
-        "4",
+        "5",
         "--n-gpu-layers",
         "0",
         "--device",
@@ -559,9 +559,9 @@ def test_command_fair_settings_tampering_is_rejected(valid_bundle: EvidenceBundl
 @pytest.mark.parametrize(
     ("mutation", "expected"),
     [
-        ("remove", "command -lv must appear exactly once as 4"),
-        ("change", "command -lv must appear exactly once as 4"),
-        ("duplicate", "command -lv must appear exactly once as 4"),
+        ("remove", "command -lv must appear exactly once as 5"),
+        ("change", "command -lv must appear exactly once as 5"),
+        ("duplicate", "command -lv must appear exactly once as 5"),
     ],
 )
 def test_command_log_verbosity_tampering_is_rejected(
@@ -577,7 +577,7 @@ def test_command_log_verbosity_tampering_is_rejected(
     elif mutation == "change":
         command[index + 1] = "3"
     else:
-        command.extend(("--verbosity", "4"))
+        command.extend(("--verbosity", "5"))
     modified = record.model_copy(update={"command": command})
     (run_dir / "requests.jsonl").write_text(
         modified.model_dump_json() + "\n",

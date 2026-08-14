@@ -91,7 +91,7 @@ def test_typed_command_is_shell_free_and_cpu_only(fake_binary: Path, tmp_path: P
     assert argv[argv.index("--n-gpu-layers") + 1] == "0"
     assert argv[argv.index("--host") + 1] == "127.0.0.1"
     assert argv.count("-lv") == 1
-    assert argv[argv.index("-lv") + 1] == "4"
+    assert argv[argv.index("-lv") + 1] == "5"
     assert command.proof.cpu_only_flags_complete
     assert command.proof.localhost
 
@@ -196,7 +196,7 @@ def test_process_readiness_logs_rss_and_cleanup(fake_binary: Path, tmp_path: Pat
     assert command_record["command_proof"]["device_none"] is True
     assert command_record["command_proof"]["gpu_layers_zero"] is True
     assert command_record["argv"].count("-lv") == 1
-    assert command_record["argv"][command_record["argv"].index("-lv") + 1] == "4"
+    assert command_record["argv"][command_record["argv"].index("-lv") + 1] == "5"
     assert os.path.basename(command_record["argv"][0]) == "fake llama-server"
 
 
