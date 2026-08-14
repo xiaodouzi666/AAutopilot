@@ -14,6 +14,7 @@ import json
 import math
 import os
 import shutil
+import struct
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -616,6 +617,21 @@ def _probe_image(path: Path, *, ffprobe: str) -> tuple[int, int]:
     return width, height
 
 
+def _png_dimensions(path: Path) -> tuple[int, int]:
+    """Read the mandatory PNG signature and IHDR without requiring media tools."""
+
+    try:
+        header = path.read_bytes()[:24]
+    except OSError as exc:
+        raise SubmissionAssetError(f"cannot read PNG evidence {path}: {exc}") from exc
+    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+        raise SubmissionAssetError(f"{path} is not a canonical PNG with an IHDR header")
+    width, height = struct.unpack(">II", header[16:24])
+    if width < 1 or height < 1:
+        raise SubmissionAssetError(f"{path} has invalid PNG dimensions")
+    return width, height
+
+
 def _read_json_text(value: str, *, label: str) -> Mapping[str, Any]:
     try:
         payload = json.loads(value)
@@ -866,9 +882,6 @@ def verify_assets(root: Path) -> None:
     entries = manifest.get("screenshots")
     if not isinstance(entries, list) or len(entries) != len(SCREENSHOT_SPECS):
         raise SubmissionAssetError("screenshot manifest must contain exactly four reviewed frames")
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        raise SubmissionAssetError("ffprobe is required to verify screenshot media")
     expected_ids = {spec["id"] for spec in SCREENSHOT_SPECS}
     actual_ids: set[str] = set()
     for entry in entries:
@@ -880,7 +893,7 @@ def verify_assets(root: Path) -> None:
         path = root / path_value
         if _sha256(path) != item.get("sha256"):
             raise SubmissionAssetError(f"screenshot hash mismatch: {path_value}")
-        if _probe_image(path, ffprobe=ffprobe) != (1920, 1080):
+        if _png_dimensions(path) != (1920, 1080):
             raise SubmissionAssetError(f"screenshot dimensions changed: {path_value}")
         data_sources = _require_mapping(
             item.get("data_sources"), label=f"{screenshot_id} data sources"

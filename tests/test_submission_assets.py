@@ -56,7 +56,9 @@ def test_quality_summary_is_recomputed_from_measured_sources() -> None:
     }
 
 
-def test_committed_submission_assets_pass_integrity_verification() -> None:
+def test_committed_submission_assets_pass_integrity_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     if (
         os.environ.get("GITHUB_ACTIONS")
         and os.environ.get("A64PILOT_VERIFY_COMMITTED_ASSETS") != "1"
@@ -65,6 +67,7 @@ def test_committed_submission_assets_pass_integrity_verification() -> None:
             "committed screenshots are a prior-run snapshot; the new final video is rendered "
             "after live evidence verification"
         )
+    monkeypatch.setattr(assets.shutil, "which", lambda _name: None)
     assets.verify_assets(ROOT)
 
 
