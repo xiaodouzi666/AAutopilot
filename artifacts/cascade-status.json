@@ -1,5 +1,31 @@
 {
-  "reason": "A4 is admitted only after weak/strong calibration and held-out quality pass",
-  "shipping_fallback": "best measured strong-only profile",
-  "status": "not-run"
+  "a4_admitted_by_quality_gate": false,
+  "escalation_rate": 0.0,
+  "freeze_id": "a0aee38577d836ff45b1079611ec66b3abc828ff4da4a57d17ce4ae144a05190",
+  "held_out_gate": {
+    "checks": {
+      "quality": true,
+      "safety": true,
+      "schema": true
+    },
+    "passed": true,
+    "quality_floor": 72.875,
+    "reasons": []
+  },
+  "performance_claim_eligible": false,
+  "policy_id": "34df5c9a566fbc373f98920b448858489ac0064799a72d2a3a6f36457c629bb6",
+  "reason": "no calibration threshold passed the frozen quality gate",
+  "route_counts": {
+    "strong": 20,
+    "weak": 0,
+    "weak_then_strong": 0
+  },
+  "route_shares": {
+    "strong": 100.0,
+    "weak": 0.0,
+    "weak_then_strong": 0.0
+  },
+  "shipping_profile": "a3-strong-only",
+  "status": "calibration-fallback-strong-only",
+  "weak_route_share": 0.0
 }

@@ -7,8 +7,8 @@ image after capture.
 ## 1. Headline evidence
 
 **Caption:** On 20 paired split-v2 final-holdout cases, KleidiAI reduced Q4_0 mean time to first
-token by **1.79%** versus the same-model generic backend. The paired 95%
-interval is **0.65% to 2.96%**, so the preregistered
+token by **1.50%** versus the same-model generic backend. The paired 95%
+interval is **0.51% to 2.60%**, so the preregistered
 primary gate passes.
 
 ## 2. Optimization pipeline
@@ -20,13 +20,13 @@ evidence-producing endpoint. Split-v2 decisions were frozen before final evaluat
 ## 3. Fair Pareto evidence
 
 **Caption:** The Pareto view keeps the fair A1/A2 comparison visible while disclosing the secondary
-p95 end-to-end latency result: **2.77%** reduction, paired 95% interval
-**-18.45% to 49.45%**. Because that interval crosses zero, it is
+p95 end-to-end latency result: **4.31%** reduction, paired 95% interval
+**-15.49% to 48.75%**. Because that interval crosses zero, it is
 reported transparently and does not unlock publication.
 
 ## 4. Validated API and deployed-profile status
 
 **Caption:** The submitted API serves the measured **strong-only** profile
-`kleidiai-q4-0-t4-b128-u64-p1-c2048` and enforces the benchmark's strict triage schema, read-only tool
-policy, and fail-closed HTTP 502 behavior. A4 routing is **not-run**; the shipping
-fallback is `best measured strong-only profile`, so no unmeasured cascade claim is made.
+`kleidiai-q4-0-t4-b128-u64-p1-c2048` and enforces the benchmark's strict triage schema, read-only tool policy, and
+fail-closed HTTP 502 behavior. A4 routing is **calibration-fallback-strong-only**; the shipping profile is
+`a3-strong-only`, so no unmeasured cascade claim is made.

@@ -58,29 +58,38 @@ carry an explicit `fixture` label and cannot support a claim.
 ## Verified Arm64 result
 
 The final evidence was produced by public GitHub Actions
-[run 31766912155](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155)
+[run 31778419786](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31778419786)
 at commit
-[`20f6c0e1e925350d94d04ebb50ede0e0591136b4`](https://github.com/xiaodouzi666/AAutopilot/commit/20f6c0e1e925350d94d04ebb50ede0e0591136b4)
-on the official `ubuntu-24.04-arm` runner. The fair A1/A2 comparison used 20 matched final-holdout
+[`6d8e21818fc0ef0202ec85236bcec6d20e908f23`](https://github.com/xiaodouzi666/AAutopilot/commit/6d8e21818fc0ef0202ec85236bcec6d20e908f23)
+on the official `ubuntu-24.04-arm` runner. The fair A1/A2 comparison used 20 matched split-v2
 cases (40 formal source rows):
 
-- **Primary:** mean Q4_0 TTFT reduction was **1.794%**, with a paired 95% bootstrap interval of
-  **0.652% to 2.955%**. The preregistered publication gate passed.
-- **Transparent secondary:** p95 end-to-end latency reduction was **2.769%**, with a paired 95%
-  interval of **-18.448% to 49.453%**. This outcome was not demonstrated.
-- **Transparent secondary:** median per-request throughput increase was **2.857%**, with a paired
-  95% interval of **-3.226% to 10.491%**. This outcome was not demonstrated.
-- A1 and A2 quality scores were **72.97** and **73.88**, respectively, and both achieved
-  **100% safety**.
+- **Primary:** mean Q4_0 TTFT reduction was **1.498%**, with a paired 95% bootstrap interval of
+  **0.514% to 2.600%**. The preregistered publication gate passed.
+- **Transparent secondary:** p95 end-to-end latency reduction was **4.310%**, with a paired 95%
+  interval of **-15.486% to 48.746%**. This outcome was not demonstrated.
+- **Transparent secondary:** median per-request throughput increase was **2.023%**, with a paired
+  95% interval of **-3.363% to 10.793%**. This outcome was not demonstrated.
+- A1 and A2 quality scores were **72.975** and **73.875**, respectively, and both achieved
+  **100% minimum safety** with zero schema failures.
+
+The same run completed the optional A4 quality workflow: 40 calibration cases froze a policy,
+but no weak-model threshold passed. The 20-case frozen replay therefore routed
+**20 strong / 0 weak / 0 weak-then-strong**, was not quality-admitted, and remained
+`performance_claim_eligible=false`. Shipping stays on the measured **A3 strong-only** profile.
+A4 is a post-hoc quality/routing replay on split-v2, not a new unseen test or a live-cascade
+latency, throughput, combined-RSS, or deployment claim.
 
 The complete redacted capture is in the
-[evidence release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155),
+[final evidence release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31778419786),
 whose evidence archive is covered by
-[GitHub artifact attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497).
-The [public demo video](https://youtu.be/RT0ORZ3iIpE) is a natural-voice, audio-only derivative:
-its visual stream and benchmark content are unchanged from the CI-rendered source, but the
-YouTube MP4 is not itself attested. The original CI-rendered video remains inside the attested
+[GitHub build-provenance attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40687167).
+The [public natural-voice demo](https://youtu.be/2wZx67_iaSw) is a disclosed audio-only derivative:
+its H.264 visual stream and benchmark content are byte/content-identical to the CI source, but the
+derivative itself is not CI-attested. The original CI-rendered video remains inside the attested
 evidence bundle and is the authoritative media source.
+
+The project is [published on Devpost](https://devpost.com/software/aarch64-autopilot-self-optimizing-agentic-ai-on-arm-cpus).
 
 ## Outputs
 
@@ -90,10 +99,12 @@ After a measured run, `artifacts/` contains:
 system-info.json              redacted hardware and software provenance
 build-manifest.json           pinned source, flags, binary hashes, backend proof
 model-manifest.json           repositories, revisions, filenames, sizes, SHA-256
-raw/<run-id>/                 commands, requests, logs, RSS and integrity hashes
+raw/<run-id>/                 commands, requests, logs, RSS and integrity hashes (release only)
 benchmark-results.{json,csv}  validated measured rows
 ablation-results.csv          A0–A4 summary
 quality-*.json                 calibration/final-holdout results and gate inputs
+a4-frozen-policy.json          immutable A4 quality policy
+quality-results.json           A4 frozen replay, routes, and admission result
 optimized-profile.yaml        selected measured deployment profile
 claims.json                   formulas, candidates, confidence intervals, source rows
 report.{html,md}              offline evidence dashboard
@@ -179,9 +190,9 @@ gh attestation verify aarch64-autopilot-evidence.tar.gz \
   -R xiaodouzi666/AAutopilot
 ```
 
-The exact [successful run](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155),
-[release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155),
-and [attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497) are the
+The exact [successful run](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31778419786),
+[release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31778419786),
+and [attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40687167) are the
 authoritative execution provenance. The repository carries the sanitized formal rows, generated
 report, and claim index for convenient review; the attested release bundle carries the full
 redacted raw capture and integrity receipts.
@@ -218,16 +229,17 @@ selected v2 set. The required ablations are:
 4. A3 — device-tuned KleidiAI strong-only profile;
 5. A4 — quality-gated weak/strong cascade, only if it passes.
 
-If A4 fails the safety, schema, or quality gate, the project ships A3 and preserves A4 as
-a rejected experiment. The fair A1/A2 comparison always reports all three preregistered outcomes
+The final A4 calibration found no admissible weak-model threshold, so the frozen policy failed
+closed to strong-only. Its 20-case quality replay is preserved as a rejected experiment, and the
+project ships A3. The fair A1/A2 comparison always reports all three preregistered outcomes
 from the same 20 paired cases (40 formal source rows): primary mean TTFT reduction, secondary p95
 end-to-end latency reduction, and secondary median per-request throughput increase. Only a
 positive primary 95% paired interval whose lower bound exceeds zero unlocks final publication;
 secondary results are never promoted into a win.
 
 The submitted deployment implementation is the measured **strong-only** profile. A4 remains an
-experimental candidate and is not described as deployed unless a future version calibrates it,
-passes the complete held-out gate, and adds a measured multi-runtime serving profile.
+experimental quality replay and is not described as deployed. Any future live cascade must use a
+new pre-frozen evaluation and add a measured multi-runtime serving profile.
 
 ## API
 

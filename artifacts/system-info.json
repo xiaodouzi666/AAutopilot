@@ -10,7 +10,7 @@
   "architecture": "aarch64",
   "architecture_raw": "aarch64",
   "arm64": true,
-  "collected_at": "2026-08-14T03:29:12.703503Z",
+  "collected_at": "2026-08-14T07:04:39.107937Z",
   "cpu_model": "unknown",
   "features": {
     "bf16": {
@@ -68,7 +68,7 @@
       "supported": true
     }
   },
-  "filesystem_free_bytes": 116219830272,
+  "filesystem_free_bytes": 116214738944,
   "kernel": "6.17.0-1022-azure",
   "limitations": [],
   "logical_cores": 4,

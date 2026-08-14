@@ -1,55 +1,99 @@
 {
-  "schema_version": 2,
-  "workflow": {
-    "run_id": 31766912155,
-    "attempt": 1,
-    "head_sha": "20f6c0e1e925350d94d04ebb50ede0e0591136b4",
-    "run_url": "https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155"
-  },
-  "release": {
-    "tag": "arm64-evidence-run-31766912155",
-    "url": "https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155"
-  },
   "attestation": {
-    "url": "https://github.com/xiaodouzi666/AAutopilot/attestations/40655497",
+    "status": "verified",
+    "id": 40687167,
+    "url": "https://github.com/xiaodouzi666/AAutopilot/attestations/40687167",
+    "rekor_log_index": 2463537656,
     "subject_name": "aarch64-autopilot-evidence.tar.gz",
-    "subject_sha256": "1ba62246f0049aace7fd7074c6000a46677c0c462e757b26b395b5ddacca1007"
+    "subject_sha256": "b3f2a719a91e483fb984bc83d3de7435d4689d158129fef2e829e1168659f829"
+  },
+  "generated_at": "2026-08-14T07:59:24.170660+00:00",
+  "index_state": "final_publication_verified",
+  "release": {
+    "status": "published",
+    "tag": "arm64-evidence-run-31778419786",
+    "url": "https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31778419786",
+    "target_sha": "6d8e21818fc0ef0202ec85236bcec6d20e908f23",
+    "evidence_bundle_sha256": "b3f2a719a91e483fb984bc83d3de7435d4689d158129fef2e829e1168659f829"
   },
   "results": {
-    "paired_final_holdout_cases": 20,
-    "formal_source_rows": 40,
-    "a1_quality_score": 72.97,
-    "a2_quality_score": 73.88,
-    "a1_safety_score": 100.0,
-    "a2_safety_score": 100.0,
-    "primary_mean_ttft_reduction_percent": 1.7935946161895577,
-    "primary_paired_95_ci_percent": [0.6515969938677603, 2.955143181713959],
-    "primary_demonstrated": true,
-    "secondary_p95_e2e_reduction_percent": 2.768626551439474,
-    "secondary_p95_e2e_paired_95_ci_percent": [-18.448447438570422, 49.453028827488474],
-    "secondary_p95_e2e_demonstrated": false,
-    "secondary_median_request_throughput_increase_percent": 2.8571096383420174,
-    "secondary_median_request_throughput_paired_95_ci_percent": [-3.2257349590330993, 10.491224440280039],
-    "secondary_median_request_throughput_demonstrated": false
+    "claims": {
+      "fair_q4_0_mean_ttft_reduction": {
+        "confidence_interval": [
+          0.5136389656173509,
+          2.60026064704425
+        ],
+        "demonstrated": true,
+        "source_row_count": 40,
+        "unit": "%",
+        "value": 1.4983603642459042
+      },
+      "fair_q4_0_p95_latency_reduction": {
+        "confidence_interval": [
+          -15.486348258135404,
+          48.745572560011766
+        ],
+        "demonstrated": false,
+        "source_row_count": 40,
+        "unit": "%",
+        "value": 4.3098000986850495
+      },
+      "fair_q4_0_request_throughput_increase": {
+        "confidence_interval": [
+          -3.3630233641974843,
+          10.793234672532613
+        ],
+        "demonstrated": false,
+        "source_row_count": 40,
+        "unit": "%",
+        "value": 2.022786288942867
+      }
+    },
+    "evidence_status": "measured"
+  },
+  "schema_version": 3,
+  "source_files": {
+    "claims.json": "475983477d7136223c42a630d6c94b0823b0a5df67098b35f93828251e04f232",
+    "quality-results.json": "164fb9039b3b1ba967f0730be1f542fccf5b2640550cd2c78031a2310a715904",
+    "quality-summary.json": "f040f1aada989da78e7eb2fc048de0af1aee52a627e2ea814afba424f603e2c3",
+    "report-data.json": "98cce38cdc60f05fbfc42132bbf270202d844279ccc1c2190f19678645a886d8",
+    "screenshots/manifest.json": "94c737ae766f85781079bd52f6d35abafa3df63a468eebaca1524eb5524e7d01",
+    "submission/a64pilot-demo-final.manifest.json": "ea60316dd02273c0ab89d779fb864530594f45d7dc973b8a441694ca9bf2d2fa"
   },
   "video": {
     "attested_source": {
-      "release_asset": "a64pilot-demo-final.mp4",
+      "attestation_status_at_index_creation": "pending_post_workflow",
+      "included_in_evidence_bundle": true,
       "manifest_path": "submission/a64pilot-demo-final.manifest.json",
-      "manifest_sha256": "8e39c7b3c9e46a5ad2a28bd005a508c79f1d5c66c8021c932ef36d3da1e67984",
-      "video_sha256": "c6785763c5180ace579ac45269956eb4e13e2f28d05514628111ab5882f41bda",
-      "included_in_attested_evidence_bundle": true
+      "manifest_sha256": "ea60316dd02273c0ab89d779fb864530594f45d7dc973b8a441694ca9bf2d2fa",
+      "release_asset": "a64pilot-demo-final.mp4",
+      "video_sha256": "9e7322eead44d50de122776356137bb0c35d635aae1b134a296aea939bee7300"
     },
-    "public_demo": {
-      "youtube_url": "https://youtu.be/RT0ORZ3iIpE",
-      "release_asset": "a64pilot-demo-natural-voice.mp4",
-      "manifest_path": "submission/a64pilot-demo-natural-voice.manifest.json",
-      "manifest_sha256": "aa140617e52f73fad6b982c42702f9865411d364382cb5abfa0b4675b70cfd91",
-      "video_sha256": "62ae7a7839e8b9f8d595df3ae9c5654bb4ea5b81b5b62c397172c6d056261ad1",
-      "audio_only_derivative": true,
-      "visual_stream_unchanged": true,
-      "this_derivative_ci_attested": false,
-      "provenance_note": "Natural narration replaces only the CI source audio; the unchanged visual stream and benchmark content derive from the attested evidence source."
+    "public_derivative": {
+      "role": "audio-only natural-voice presentation derivative",
+      "youtube_url": "https://youtu.be/2wZx67_iaSw",
+      "release_asset": "a64pilot-demo-natural-voice-run-31778419786.mp4",
+      "release_asset_url": "https://github.com/xiaodouzi666/AAutopilot/releases/download/arm64-evidence-run-31778419786/a64pilot-demo-natural-voice-run-31778419786.mp4",
+      "manifest_asset": "a64pilot-demo-natural-voice-run-31778419786.manifest.json",
+      "manifest_url": "https://github.com/xiaodouzi666/AAutopilot/releases/download/arm64-evidence-run-31778419786/a64pilot-demo-natural-voice-run-31778419786.manifest.json",
+      "video_sha256": "e9f6a6d1f043fb943f21468f704e0fa711f850d47e32f743f703c1a1205dbeb3",
+      "manifest_sha256": "0990f01e992ceacc54b4352d4d15811bdf351e816da95169917f9f318545d565",
+      "visual_stream_sha256": "65408bbb2f004caeb7efab80d629d66f52eb974341df9d0a34ee51934895057e",
+      "attestation_status": "not_attested_derivative",
+      "visual_stream_identical_to_attested_source": true
     }
+  },
+  "workflow": {
+    "attempt": 1,
+    "head_sha": "6d8e21818fc0ef0202ec85236bcec6d20e908f23",
+    "run_id": 31778419786,
+    "run_url": "https://github.com/xiaodouzi666/AAutopilot/actions/runs/31778419786"
+  },
+  "devpost": {
+    "state": "published",
+    "url": "https://devpost.com/software/aarch64-autopilot-self-optimizing-agentic-ai-on-arm-cpus",
+    "video_url": "https://youtu.be/2wZx67_iaSw",
+    "submitted_at": "2026-08-14T02:04:58.469-04:00",
+    "final_readback_verified": true
   }
 }

@@ -39,9 +39,9 @@ decisions before held-out evaluation and selects only a measured feasible profil
 
 “These three preregistered outcomes use twenty paired cases and forty formal source rows. Mean time to first token is the primary outcome; only its positive interval can unlock the final result.”
 
-“The primary Q4_0 mean time-to-first-token reduction is 1.79 percent. Its paired 95 percent interval is 0.65 to 2.96 percent. That interval excludes zero on the positive side. ”
-“The secondary Q4_0 p95 end-to-end latency reduction is 2.77 percent. Its paired 95 percent interval is -18.45 to 49.45 percent. That interval crosses zero. This transparent secondary result cannot unlock publication.”
-“The secondary Q4_0 median per-request throughput increase is 2.86 percent. Its paired 95 percent interval is -3.23 to 10.49 percent. That interval crosses zero. This transparent secondary result cannot unlock publication.”
+“The primary Q4_0 mean time-to-first-token reduction is 1.50 percent. Its paired 95 percent interval is 0.51 to 2.60 percent. That interval excludes zero on the positive side. ”
+“The secondary Q4_0 p95 end-to-end latency reduction is 4.31 percent. Its paired 95 percent interval is -15.49 to 48.75 percent. That interval crosses zero. This transparent secondary result cannot unlock publication.”
+“The secondary Q4_0 median per-request throughput increase is 2.02 percent. Its paired 95 percent interval is -3.36 to 10.79 percent. That interval crosses zero. This transparent secondary result cannot unlock publication.”
 
 ## Target-device footage
 

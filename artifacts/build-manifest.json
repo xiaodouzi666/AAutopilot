@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T03:36:40.842535Z",
+  "generated_at": "2026-08-14T07:12:33.838355Z",
   "schema_version": "1.0.0",
   "source_url": "https://github.com/ggml-org/llama.cpp.git",
   "variants": [
@@ -12,8 +12,8 @@
       },
       "binary_sha256": {
         "llama-bench": "8b8415ce52a6223871d35ca1b22e1d4daef51ca151196e53643a507f188031fc",
-        "llama-cli": "d6158ae18d4ee194492709a918e969f7ce3a38c47bacffc825ec3acfdb703432",
-        "llama-server": "c93b33ca4acfe946ff323e58ee0e2febd773fd1b3b86c5f0abe72aa85bcefaab"
+        "llama-cli": "4a56bf13593b8fca584bea9dc4a3ded926d578175d014db896ccfb5b4068deb2",
+        "llama-server": "a61f373aca7d35687d0a145a3f926be94fb5236832acf886a80f9bd7bd553baa"
       },
       "build_type": "Release",
       "cmake_flags": [
@@ -58,8 +58,8 @@
       },
       "binary_sha256": {
         "llama-bench": "df532f240e966ea1dae2536ba5360daa8852a413095b3305e4158109a14af26a",
-        "llama-cli": "e5dacb22478be1f91ac1ee4f0051395a216df0063a670d6f2b713ff595b48a10",
-        "llama-server": "5020e911a40ca0fd0bb742638d47d8610b6797846b6dd02c49d7ae118e22e8eb"
+        "llama-cli": "b080b61eb763188f96934ba7351240ddbaa1688289f5da91567635b30f4c8894",
+        "llama-server": "2bb33e276ab53169dae3b4d2664c0aea0c45ef76324f05cbd48fed9b2ab2103a"
       },
       "build_type": "Release",
       "cmake_flags": [

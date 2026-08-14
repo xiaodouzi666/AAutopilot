@@ -28,8 +28,8 @@
         }
       }
     ],
-    "created": 1786680171,
-    "id": "chatcmpl-4d98ec82aa7341d499cb41bca88993b4",
+    "created": 1786693800,
+    "id": "chatcmpl-8722b98ac3e548c8827f9ebe3246209c",
     "model": "a64pilot-fixture-not-for-benchmark",
     "object": "chat.completion",
     "usage": {

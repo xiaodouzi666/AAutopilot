@@ -1,7 +1,7 @@
 {
   "capture_policy": {
     "captions_path": "artifacts/screenshots/captions.md",
-    "captions_sha256": "5eedab5fbfeec63591f1623b91aa996b6dd7455fe001d384c14e237c07b1922c",
+    "captions_sha256": "d8c0f6d5a1fdb8c707ac1223f7203bf545a6b534417d46175828c881b9cff69b",
     "frame_dimensions": "1920x1080",
     "frame_editing": "none",
     "timecodes": "reviewed static scene interiors, away from scene transitions"
@@ -11,9 +11,9 @@
   "screenshots": [
     {
       "data_sources": {
-        "artifacts/claims.json": "a34ea3537aeb6a4f31d853cbe208cf68edcf575241a6c3fe391e1d07e4739fa5",
-        "artifacts/figures/ablation.png": "f49a70465b72f2cf244959a5eafb616367bf95cfd72e0785b3871f38b986f2ca",
-        "artifacts/report-data.json": "9f76501efdcb0c1bb9fac1e16b864c351675b01fc4be81cf2fa19de90a75ecf3"
+        "artifacts/claims.json": "475983477d7136223c42a630d6c94b0823b0a5df67098b35f93828251e04f232",
+        "artifacts/figures/ablation.png": "2659f85ffcd063125cc9f4531672020f758acede2ddacc442b0f049ac7d49de8",
+        "artifacts/report-data.json": "98cce38cdc60f05fbfc42132bbf270202d844279ccc1c2190f19678645a886d8"
       },
       "extraction": "exact video frame; no post-capture text or metric edits",
       "filename": "01-headline-evidence.png",
@@ -26,14 +26,14 @@
         58.904,
         74.277
       ],
-      "sha256": "13895ba40d3b52bf4b009c8900b0f84f09c88c49b54f7bf248f34a6fdefd2e3c",
+      "sha256": "d9060cc4886488b1f1b44b84177b32e92691ca511a9ab42e36178f147dd57566",
       "timecode_seconds": 66.0,
       "width": 1920
     },
     {
       "data_sources": {
-        "artifacts/build-manifest.json": "8edecd47ec6b2b5c80a7bf802f13be7b78424abffe619f64a57a45a04aa332dc",
-        "artifacts/model-manifest.json": "ba65ad1dc4d3a0b92fd4af361892d5913c7ccb91fae2ea97ed0e5345769e33a8",
+        "artifacts/build-manifest.json": "395d3b571b69c83d4af52d7042604b330fb7ecd4762ac3df6cd77a98e0912e52",
+        "artifacts/model-manifest.json": "4c6581aa21269262e2163bf84560aa6c4a608e88d58d77216a4f6d0c63656900",
         "demo/split.json": "92e312535402fa92903c453f0c84c5799bd0dbc5449e60023d3e6259b138949d"
       },
       "extraction": "exact video frame; no post-capture text or metric edits",
@@ -47,15 +47,15 @@
         12.33,
         34.903
       ],
-      "sha256": "64736532d673939824091ccab8dce48eb536e6c53bdd9b73d0d35050d1e539db",
+      "sha256": "94e179739b0db098ac0c3efc668d6fddef3308f9389338ec7170cd80412a4f3e",
       "timecode_seconds": 20.0,
       "width": 1920
     },
     {
       "data_sources": {
-        "artifacts/benchmark-results.json": "72f5b27161835b7770b81a3a5234f3868325e6bfc4a6c9c22359b8c2c4574db6",
-        "artifacts/claims.json": "a34ea3537aeb6a4f31d853cbe208cf68edcf575241a6c3fe391e1d07e4739fa5",
-        "artifacts/figures/pareto.png": "6aa8b08da0d837226718f58e445b2c4f501082e67f7327b8a2b826a3e5ba1fde"
+        "artifacts/benchmark-results.json": "449536d57151b57c75977378ee0cda9a93b9c12100d802650e0bf0d5df717577",
+        "artifacts/claims.json": "475983477d7136223c42a630d6c94b0823b0a5df67098b35f93828251e04f232",
+        "artifacts/figures/pareto.png": "54db2f6853b43b74533fd02a0a045894652a37a73446849d3606a7ced4293b9a"
       },
       "extraction": "exact video frame; no post-capture text or metric edits",
       "filename": "03-fair-pareto.png",
@@ -68,14 +68,14 @@
         74.277,
         91.076
       ],
-      "sha256": "ba3885db8a5f574da07f1bb0991ab78d54b570887f5d43ee18fd03bdf62f60bc",
+      "sha256": "3599f458b156dc851b00df756219c3fbb79664733f956734310eec2e780fdd4f",
       "timecode_seconds": 82.0,
       "width": 1920
     },
     {
       "data_sources": {
-        "artifacts/cascade-status.json": "9158a0dd81a39a7ca3987584701c7018bbe231ba9b647554d218fef08e540134",
-        "artifacts/optimized-profile.yaml": "817bc0b6fde2cfc794978dad521a274b6a7f2e0edeaf41dfe4164ecd99db9095",
+        "artifacts/cascade-status.json": "b54367eb4980c897f46db9ef0b4a3a9e456daf0794ff40170a11e6561ba2d4c5",
+        "artifacts/optimized-profile.yaml": "83055fb08760467d19ae06f0bbdaf6220425afe89cb2f6e188c396abb533eaa5",
         "scripts/render-demo-video.py": "94b2311acf37e117d86661f01415a4ccbccb56a57e29cb296a96390a68c46425"
       },
       "extraction": "exact video frame; no post-capture text or metric edits",
@@ -89,19 +89,23 @@
         106.642,
         118.793
       ],
-      "sha256": "7b2822f3f75c9524f5e02190acee349ae297326d1ce3c389511493d189a250db",
+      "sha256": "b295e6efdeaa9525a3758472112068baa1ab0d87b26a68b3cb1115784c84cd0f",
       "timecode_seconds": 112.0,
       "width": 1920
     }
   ],
   "source_video": {
-    "duration_seconds": 139.039,
-    "github_run_url": "https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155",
-    "kind": "attested CI demo source",
+    "duration_seconds": 139.215,
+    "github_run_attempt": 1,
+    "github_run_id": 31778419786,
+    "github_run_url": "https://github.com/xiaodouzi666/AAutopilot/actions/runs/31778419786",
+    "github_sha": "6d8e21818fc0ef0202ec85236bcec6d20e908f23",
+    "kind": "CI demo source with workflow-bound provenance",
     "manifest_path": "artifacts/submission/a64pilot-demo-final.manifest.json",
-    "manifest_sha256": "8e39c7b3c9e46a5ad2a28bd005a508c79f1d5c66c8021c932ef36d3da1e67984",
+    "manifest_sha256": "ea60316dd02273c0ab89d779fb864530594f45d7dc973b8a441694ca9bf2d2fa",
     "release_asset": "a64pilot-demo-final.mp4",
-    "release_url": "https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155",
-    "sha256": "c6785763c5180ace579ac45269956eb4e13e2f28d05514628111ab5882f41bda"
+    "release_status": "pending_post_workflow",
+    "release_url": null,
+    "sha256": "9e7322eead44d50de122776356137bb0c35d635aae1b134a296aea939bee7300"
   }
 }

@@ -35,11 +35,10 @@ requires the primary KleidiAI Q4 marker and rejects any additional or different 
 
 The included workload contains 60 original synthetic cloud incidents. The v1 test set was
 executed in failed run6 and used for error analysis, so it is retired from final evaluation.
-Before the successful final run, split v2 selected 20 final-holdout cases from 36 never-executed
-candidates with a frozen category-stratified hash procedure whose only inputs were category and
-case ID.
-Only v2 is described as the unseen final holdout; `demo/split-freeze-v2.json` preserves
-every selection input and both split hashes. The agent may request deterministic read-only fixture
+Before the successful final Arm run, split v2 selected 20 final-holdout cases from 36 never-executed candidates
+with a frozen category-stratified hash procedure whose only inputs were category and case ID.
+Only v2 is described as the unseen final holdout; `demo/split-freeze-v2.json` preserves every
+selection input and both split hashes. The agent may request deterministic read-only fixture
 tools; it never executes model-generated shell commands.
 
 ## Why This Matters
@@ -62,12 +61,14 @@ quality held, and exactly how to reproduce the result.
 ## How We Used AI
 
 The submitted endpoint serves the measured official Qwen2.5 1.5B strong-only profile for
-structured synthetic incident triage. It forces the benchmark's strict triage schema even when a
-client requests a weaker response format, then validates schema, read-only tool arguments, safety,
-and internal consistency before returning the response. Invalid output fails closed with HTTP 502.
-The 0.5B/1.5B A4 router remains an optional experiment and is deployable only in a future profile
-that passes calibration and the complete held-out gate. Expected answers are never inserted into
-prompts or router features.
+structured synthetic incident triage. It enforces the benchmark's typed triage schema, then
+validates schema, read-only tool arguments, safety, and internal consistency before returning a
+response. Invalid output fails closed with HTTP 502.
+
+The final Arm run also measured the optional 0.5B/1.5B A4 routing workflow. Calibration found no
+admissible weak-model threshold, so its immutable policy failed closed to strong-only. The A4
+quality replay was not admitted, carries no performance claim, and does not change the submitted
+A3 strong-only deployment.
 
 ## How We Used Codex
 
@@ -93,44 +94,60 @@ project's non-negotiable rule that no performance number can be fabricated.
 
 ## Architecture
 
-The CLI coordinates hardware inspection, dual native builds, official model acquisition,
-service benchmarking, quality evaluation, staged search, and reporting. The selected profile
-feeds a localhost OpenAI-compatible proxy and currently takes one measured strong-model path.
-The proxy applies constrained output plus a final safety/consistency validator before responding.
-An A4 complexity router exists as a candidate experiment, not as a claim about the submitted
-deployment; it requires calibration, full held-out acceptance, and a measured multi-runtime
-profile before serving. Raw evidence is append-only, hashed, and rendered independently from
-inference.
+The CLI coordinates hardware inspection, same-commit native builds, official model acquisition,
+service benchmarking, quality evaluation, bounded search, and report generation. The selected
+profile feeds a localhost OpenAI-compatible proxy and currently takes one measured strong-model
+path. The proxy applies constrained output plus a final safety/consistency validator before
+responding. The 0.5B/1.5B A4 router is measured as a fail-closed quality experiment, not as the
+submitted deployment. Its final frozen replay selected strong-only, and a future live cascade
+would still require a separately measured multi-runtime performance profile before serving. Raw
+evidence is append-only, hashed, and rendered independently from inference.
 
 ## Measured Results
 
-The direct A1/A2 comparison covers **20 paired final-holdout cases / 40 formal source rows**.
-Mean time-to-first-token reduction is the prospectively registered primary outcome; p95
-end-to-end latency reduction and median per-request throughput increase are transparent secondary
-outcomes from that same source set:
+The direct A1/A2 comparison covers **20 matched split-v2 cases / 40 formal source rows** on an
+official GitHub-hosted `ubuntu-24.04-arm` runner. Mean time-to-first-token reduction was
+prospectively registered as the sole primary publication outcome. The other two metrics are
+transparent secondary results and cannot unlock publication.
 
-- **Primary — Q4_0 mean time-to-first-token reduction:** **1.794%**, with a paired 95% bootstrap
-  interval of **0.652% to 2.955%**. The interval excludes zero on the positive side, so the
-  preregistered primary publication gate passes.
-- **Secondary — Q4_0 p95 end-to-end latency reduction:** **2.769%**, with a paired 95% bootstrap
-  interval of **-18.448% to 49.453%**. The interval crosses zero; this outcome is disclosed and
-  was not demonstrated.
-- **Secondary — Q4_0 median per-request throughput increase:** **2.857%**, with a paired 95%
-  bootstrap interval of **-3.226% to 10.491%**. The interval crosses zero; this outcome is
-  disclosed and was not demonstrated.
-- A1 and A2 quality scores were **72.97** and **73.88**, respectively, and both achieved
-  **100% safety**.
+- **Primary — Q4_0 mean TTFT reduction: 1.498%**, paired 95% bootstrap CI **[0.514%, 2.600%]**. The interval excludes zero on the positive side, so the primary gate passes.
+- **Secondary — Q4_0 p95 end-to-end latency reduction: 4.310%**, paired 95% bootstrap CI **[-15.486%, 48.746%]**. The interval crosses zero; this is not a demonstrated improvement.
+- **Secondary — Q4_0 median per-request throughput increase: 2.023%**, paired 95% bootstrap CI **[-3.363%, 10.793%]**. The interval crosses zero; this is not a demonstrated improvement.
 
-Exact formulas and the shared 40 source IDs are listed once in
+Both fair-pair groups passed the task gate: A1 quality **72.975**, A2 quality **73.875**, and both
+recorded minimum safety **100/100** with zero schema failures. Exact formulas, source IDs, and
+machine-readable confidence intervals are in
 [`artifacts/claims.json`](https://github.com/xiaodouzi666/AAutopilot/blob/main/artifacts/claims.json).
-The measurements came from public GitHub Actions
-[run 31766912155](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155)
-at commit
-[`20f6c0e1e925350d94d04ebb50ede0e0591136b4`](https://github.com/xiaodouzi666/AAutopilot/commit/20f6c0e1e925350d94d04ebb50ede0e0591136b4).
-The [release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155)
-contains the full redacted raw archive, commands, logs, integrity receipts, and media; its evidence
-archive is covered by
-[GitHub artifact attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497).
+
+## A4 Weak/Strong Quality Replay
+
+The final Arm run measured real Qwen2.5 0.5B and 1.5B component outputs for 40 calibration cases,
+wrote immutable freeze `a0aee385…5190` and policy `34df5c9a…bb6`, then replayed that frozen
+decision on 20 split-v2 cases.
+
+Calibration found no admissible weak-model threshold, so the policy failed closed to strong-only.
+The replay produced **20 strong routes, 0 weak routes, 0 weak-then-strong routes, and 0%
+escalation**. A4 was **not quality-admitted**, `performance_claim_eligible=false`, and the
+shipping profile remains **A3 strong-only**.
+
+This is disclosed as a post-hoc measured quality/routing replay on split-v2 cases already used by
+A0–A3. It is not presented as a new unseen confirmatory set, a live-cascade latency/RSS
+measurement, or a performance claim.
+
+## Public Evidence
+
+- **Repository:** https://github.com/xiaodouzi666/AAutopilot
+- **Successful Arm64 workflow:** https://github.com/xiaodouzi666/AAutopilot/actions/runs/31778419786
+- **Exact measured commit:** https://github.com/xiaodouzi666/AAutopilot/commit/6d8e21818fc0ef0202ec85236bcec6d20e908f23
+- **Attested evidence release:** https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31778419786
+- **GitHub build-provenance attestation:** https://github.com/xiaodouzi666/AAutopilot/attestations/40687167
+- **Natural-voice demo (139 seconds):** https://youtu.be/2wZx67_iaSw
+
+The public demo preserves the CI video's H.264 visual stream byte-for-byte and replaces only its
+audio with clearer local Samantha narration. Its
+[sidecar](https://github.com/xiaodouzi666/AAutopilot/releases/download/arm64-evidence-run-31778419786/a64pilot-demo-natural-voice-run-31778419786.manifest.json)
+identifies it as an audio-only derivative, not the CI-attested original. The release contains both
+videos, manifests, the target receipt, A4 freeze/results, and the attested evidence archive.
 
 ## Setup Instructions
 
@@ -169,17 +186,16 @@ https://github.com/xiaodouzi666/AAutopilot
 
 ## Public Demo Link
 
-The complete offline dashboard is versioned under `artifacts/report.html` in the public
-repository. The full evidence bundle is available from the
-[final release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155).
-The live inference service binds to localhost by default for safety.
+The complete offline dashboard is versioned under
+[`artifacts/report.html`](https://github.com/xiaodouzi666/AAutopilot/blob/main/artifacts/report.html).
+The live inference service binds to localhost by default for safety. The complete redacted runtime
+evidence and current media are in the
+[final evidence release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31778419786).
 
 ## Demo Video
 
-[Watch the public demo on YouTube](https://youtu.be/RT0ORZ3iIpE). This natural-voice edition is an
-audio-only derivative of the CI-rendered video: its visual stream and benchmark content are
-unchanged, but the YouTube MP4 itself is not covered by the GitHub attestation. The original
-CI-rendered video remains inside the attested evidence bundle as the authoritative media source.
+Watch the public 139-second natural-voice demo:
+https://youtu.be/2wZx67_iaSw
 
 ## Challenges We Ran Into
 
@@ -219,12 +235,15 @@ tests, benchmark protocol, API, report, visuals, and submission automation. Git 
 
 ## Known Limitations
 
-- Results apply only to the recorded target, runtime commit, models, and workload.
-- The synthetic incident task is not a general model capability benchmark.
-- A4 weak/strong routing is not part of the submitted strong-only deployment; it remains optional
-  unless a future measured multi-runtime profile passes calibration and the held-out gate.
-- Energy and cost are omitted without credible target counters or an explicit instance price.
-- Performix and RK3588 portability are supporting extensions, not core requirements.
+- Results apply only to the recorded target, runtime commit, model files, and workload.
+- The synthetic incident task is not a general model-capability benchmark.
+- The evidence proves a KleidiAI-enabled Q4_0 path at build, model-load, and validated-request
+  levels; it is not instruction-level or per-tensor microkernel tracing.
+- A4 is not part of the submitted deployment and carries no live-route performance, combined-RSS,
+  latency, or throughput claim.
+- Energy and cost are omitted because the target provided no credible energy counter or stable
+  instance price.
+- The live inference service binds to localhost by default for safety.
 
 ## License and Third-party Use
 

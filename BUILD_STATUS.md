@@ -29,11 +29,13 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
   throughput outcomes; only a positive primary confidence interval can unlock final publication.
 - [x] Validated strong-only OpenAI-compatible API, local report UI, metrics, fixture smoke mode, and
   strict measured-profile deployment loader.
+- [x] Real A4 weak/strong component measurement, immutable 40-case calibration freeze, once-only
+  20-case frozen quality replay, strict nested provenance replay, and fail-closed A3 shipping.
 - [x] Official Arm64 GitHub Actions pipeline for build, model download, benchmark, report, target
   demo receipt, final video, redaction, provenance attestation, and 90-day artifacts.
 - [x] Devpost write-up template, compliance checklist, thumbnail, target-bound video renderer, and
   a clearly watermarked non-publishable local draft.
-- [x] Local source suite: 183 tests plus Ruff, formatting, shell syntax, workflow YAML, wheel, data,
+- [x] Final source gate: 270 tests plus Ruff, formatting, shell syntax, workflow YAML, wheel, data,
   fixture, secret/redaction, and fail-closed media checks.
 - [x] Chrome click-through of every report navigation/skip link; desktop visual inspection; loaded
   figures; non-streaming/streaming fixture API; health/models/metrics; traversal rejection; and
@@ -43,27 +45,37 @@ Arm64 Linux evidence without substituting fixture or macOS numbers.
 
 - [x] Make the GitHub repository public and push the verified implementation.
 - [x] Preserve failed run6 as diagnostic evidence only, retire its observed v1 test set, and freeze
-  the auditable split-v2 manifest before the successful final run.
-- [x] Complete and inspect official `ubuntu-24.04-arm` split-v2
-  [run 31766912155](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31766912155) at
-  commit `20f6c0e1e925350d94d04ebb50ede0e0591136b4`.
+  the auditable split-v2 manifest before final measurement.
+- [x] Complete and inspect official `ubuntu-24.04-arm`
+  [run 31778419786](https://github.com/xiaodouzi666/AAutopilot/actions/runs/31778419786) at
+  commit `6d8e21818fc0ef0202ec85236bcec6d20e908f23`.
+- [x] Run A4 calibration/freeze/replay; record fail-closed strong-only routing and keep shipping on
+  A3 because A4 was not quality-admitted or performance-claim eligible.
 - [x] Publish the sanitized evidence in the
-  [release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31766912155)
-  and verify its [GitHub artifact attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40655497).
-- [x] Publish the [natural-voice demo](https://youtu.be/RT0ORZ3iIpE) as an audio-only derivative
-  of the CI-rendered video, with an explicit non-attested derivative manifest in the release.
-- [ ] Complete the Devpost form and submit only after the required final explicit confirmation.
+  [final release](https://github.com/xiaodouzi666/AAutopilot/releases/tag/arm64-evidence-run-31778419786)
+  and verify its [GitHub build-provenance attestation](https://github.com/xiaodouzi666/AAutopilot/attestations/40687167).
+- [x] Publish the [natural-voice demo](https://youtu.be/2wZx67_iaSw) as an audio-only derivative
+  whose visual stream is byte-identical to the CI-rendered source, with an explicit non-attested
+  derivative manifest in the release.
+- [x] Submit to Devpost and verify the live published project:
+  https://devpost.com/software/aarch64-autopilot-self-optimizing-agentic-ai-on-arm-cpus.
 
 ## Honest current limitation
 
 The development host is Apple Silicon/macOS, so it remains valid for source, package, UI, and
 fixture verification but not for the Cloud AI performance claim. The competition evidence comes
-instead from successful public Arm64 Linux run 31766912155. Across 20 paired final-holdout cases,
-the primary mean-TTFT reduction was 1.794% with a paired 95% interval of 0.652% to 2.955%, so the
-preregistered publication gate passed. A1/A2 quality was 72.97/73.88 and both safety scores were
-100%. The secondary p95 end-to-end reduction (2.769%, interval -18.448% to 49.453%) and median
-per-request throughput increase (2.857%, interval -3.226% to 10.491%) were not demonstrated and
-are not promoted as wins.
+from successful public Arm64 Linux run 31778419786. Across 20 matched split-v2 cases, the primary
+mean-TTFT reduction was **1.498%** with paired 95% CI **[0.514%, 2.600%]**, so the preregistered
+publication gate passed. A1/A2 quality was **72.975/73.875**, both minimum safety scores were
+**100/100**, and neither group had a schema failure. Secondary p95 end-to-end reduction
+(**4.310%**, CI **[-15.486%, 48.746%]**) and median per-request throughput increase
+(**2.023%**, CI **[-3.363%, 10.793%]**) were not demonstrated and are not promoted as wins.
+
+A4's 40-case calibration found no admissible weak-model threshold. Its frozen 20-case quality
+replay routed 20 strong / 0 weak / 0 weak-then-strong, was not quality-admitted, and is explicitly
+not performance-claim eligible. Shipping remains A3 strong-only. This replay is not a new unseen
+confirmatory set and provides no live-cascade latency, throughput, combined-RSS, or deployment
+claim.
 
 The YouTube demo replaces only the narration of the CI-rendered video. Its H.264 visual stream and
 benchmark content are unchanged, but the derived YouTube MP4 is not itself covered by the GitHub

@@ -1,26 +1,26 @@
 {
   "architecture": "aarch64",
-  "backend": "kleidiai",
-  "candidate_id": "a2-kleidiai-q4-0",
-  "case_id": "incident-051",
-  "diagnosis": "unknown",
+  "backend": "generic",
+  "candidate_id": "a1-generic-q4-0",
+  "case_id": "incident-053",
+  "diagnosis": "network_failure",
   "evidence_status": "measured",
   "github_run_attempt": 1,
-  "github_run_id": "31766912155",
-  "github_sha": "20f6c0e1e925350d94d04ebb50ede0e0591136b4",
+  "github_run_id": "31778419786",
+  "github_sha": "6d8e21818fc0ef0202ec85236bcec6d20e908f23",
   "kernel": "6.17.0-1022-azure",
   "model": "strong",
   "operating_system": "Linux",
   "output_validation": "schema_safety_consistency_passed",
   "repository": "xiaodouzi666/AAutopilot",
-  "runner_name": "GitHub Actions 1000000414",
+  "runner_name": "GitHub Actions 1000000419",
   "schema_version": "1.0",
-  "severity": "low",
-  "source_run_id": "02e33fd7b687440b86523d7e4cb2b854",
+  "severity": "medium",
+  "source_run_id": "0a7165c4b4fd48f7956f5b05086f7590",
   "tool_calls": [
     "check_network"
   ],
   "workflow": "arm64-evidence",
   "workflow_ref": "xiaodouzi666/AAutopilot/.github/workflows/arm64-evidence.yml@refs/heads/main",
-  "workflow_sha": "20f6c0e1e925350d94d04ebb50ede0e0591136b4"
+  "workflow_sha": "6d8e21818fc0ef0202ec85236bcec6d20e908f23"
 }
