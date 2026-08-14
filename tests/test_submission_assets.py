@@ -51,6 +51,36 @@ def _write_png(path: Path, payload: bytes) -> Path:
     return path
 
 
+def _write_caption_fixture(root: Path, cascade: dict[str, object]) -> None:
+    artifacts = root / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "claims.json").write_text(
+        json.dumps(
+            [
+                {
+                    "claim_id": "fair_q4_0_mean_ttft_reduction",
+                    "value": 12.5,
+                    "confidence_interval": [10.0, 15.0],
+                },
+                {
+                    "claim_id": "fair_q4_0_p95_latency_reduction",
+                    "value": 4.5,
+                    "confidence_interval": [-1.0, 8.0],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (artifacts / "optimized-profile.yaml").write_text(
+        "profile_id: a2-kleidiai-q4-0\n",
+        encoding="utf-8",
+    )
+    (artifacts / "cascade-status.json").write_text(
+        json.dumps(cascade),
+        encoding="utf-8",
+    )
+
+
 def test_quality_summary_is_recomputed_from_measured_sources() -> None:
     summary = assets.build_quality_summary(ROOT)
 
@@ -145,6 +175,57 @@ def test_stdlib_png_parser_rejects_trailing_data(tmp_path: Path) -> None:
 
     with pytest.raises(assets.SubmissionAssetError, match="trailing data after PNG IEND"):
         assets._png_dimensions(path)
+
+
+def test_captions_prefer_new_a4_shipping_profile(tmp_path: Path) -> None:
+    _write_caption_fixture(
+        tmp_path,
+        {
+            "status": "held-out-quality-accepted",
+            "shipping_profile": "a3-strong-only",
+            "shipping_fallback": "legacy-strong-only-fallback",
+        },
+    )
+
+    captions = assets._captions(tmp_path)
+
+    assert "A4 routing is **held-out-quality-accepted**" in captions
+    assert "shipping profile is\n`a3-strong-only`" in captions
+    assert "legacy-strong-only-fallback" not in captions
+    assert "None" not in captions
+
+
+def test_captions_fall_back_to_legacy_shipping_field(tmp_path: Path) -> None:
+    _write_caption_fixture(
+        tmp_path,
+        {
+            "status": "not-run",
+            "shipping_fallback": "best measured strong-only profile",
+        },
+    )
+
+    captions = assets._captions(tmp_path)
+
+    assert "shipping profile is\n`best measured strong-only profile`" in captions
+    assert "None" not in captions
+
+
+@pytest.mark.parametrize(
+    "cascade",
+    [
+        {"shipping_profile": "a3-strong-only"},
+        {"status": "held-out-quality-accepted"},
+    ],
+    ids=["missing-status", "missing-shipping-profile"],
+)
+def test_captions_fail_closed_when_a4_status_fields_are_missing(
+    tmp_path: Path,
+    cascade: dict[str, object],
+) -> None:
+    _write_caption_fixture(tmp_path, cascade)
+
+    with pytest.raises(assets.SubmissionAssetError, match="captions require a non-empty"):
+        assets._captions(tmp_path)
 
 
 def test_current_publishable_surfaces_pass_placeholder_policy() -> None:

@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 from uuid import uuid4
 
+from a64pilot.agent.prompt import build_messages, prompt_fingerprint
+from a64pilot.agent.schema import IncidentCase, triage_json_schema, triage_openai_response_format
 from a64pilot.benchmark.quality import (
     FrozenRoutingPolicy,
     QualityGateConfig,
@@ -30,8 +33,16 @@ from a64pilot.benchmark.quality import (
     stable_file_sha256,
     validate_dataset,
 )
-from a64pilot.benchmark.runner import RealServiceBenchmark, RuntimeCandidate, run_candidate_sync
+from a64pilot.benchmark.runner import (
+    REAL_BENCHMARK_MAX_TOKENS,
+    REAL_BENCHMARK_SEED,
+    RealServiceBenchmark,
+    RuntimeCandidate,
+    _reviewed_model_proof,
+    run_candidate_sync,
+)
 from a64pilot.benchmark.store import ArtifactStore
+from a64pilot.build.verify_backend import verify_backend_log, verify_cpu_only
 from a64pilot.models.checksum import sha256_file
 from a64pilot.provenance import write_json
 from a64pilot.schemas import BenchmarkRecord
@@ -168,6 +179,56 @@ def _candidate(
     )
 
 
+def _expected_component_command(candidate: RuntimeCandidate, port: str) -> list[str]:
+    return [
+        str(candidate.binary),
+        "--model",
+        str(candidate.model),
+        "--alias",
+        candidate.candidate_id,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        port,
+        "--threads",
+        str(candidate.threads),
+        "--batch-size",
+        str(candidate.batch),
+        "--ubatch-size",
+        str(candidate.ubatch),
+        "--ctx-size",
+        str(candidate.context),
+        "--parallel",
+        str(candidate.parallel),
+        "--seed",
+        str(REAL_BENCHMARK_SEED),
+        "-lv",
+        "5",
+        "--device",
+        "none",
+        "--n-gpu-layers",
+        "0",
+    ]
+
+
+def _verify_component_command(record: BenchmarkRecord, candidate: RuntimeCandidate) -> None:
+    command = record.command
+    try:
+        port_index = command.index("--port")
+        port = command[port_index + 1]
+        port_number = int(port)
+    except (ValueError, IndexError) as exc:
+        raise CascadeWorkflowError(f"A4 row {record.run_id} has no valid server port") from exc
+    if not 1 <= port_number <= 65535:
+        raise CascadeWorkflowError(f"A4 row {record.run_id} has no valid server port")
+    expected = _expected_component_command(candidate, port)
+    optional_suffixes = ([], ["--metrics"], ["--no-webui"], ["--metrics", "--no-webui"])
+    if command[: len(expected)] != expected or command[len(expected) :] not in optional_suffixes:
+        raise CascadeWorkflowError(
+            f"A4 row {record.run_id} command does not replay the frozen runtime plan"
+        )
+
+
 def _load_measured_outputs(
     store: ArtifactStore,
     records: list[BenchmarkRecord],
@@ -177,8 +238,11 @@ def _load_measured_outputs(
     expected_role: str,
     expected_candidate: RuntimeCandidate,
     expected_dataset: dict[str, str],
+    expected_cases: dict[str, IncidentCase],
 ) -> MeasuredOutputCollection:
     expected = set(expected_case_ids)
+    if set(expected_cases) != expected:
+        raise CascadeWorkflowError(f"{expected_role} expected-case payload is incomplete")
     if len(records) != len(expected_case_ids):
         raise CascadeWorkflowError(
             f"{expected_role} component produced {len(records)} rows; "
@@ -188,10 +252,19 @@ def _load_measured_outputs(
     run_ids: list[str] = []
     model_hashes: set[str] = set()
     expected_model_hash = sha256_file(expected_candidate.model)
+    try:
+        reviewed_model = _reviewed_model_proof(expected_candidate, expected_model_hash)
+        cmake_cache = expected_candidate.cmake_cache.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError) as exc:
+        raise CascadeWorkflowError(
+            f"{expected_role} model/build proof does not match the reviewed runtime"
+        ) from exc
     expected_candidate_payload = json.loads(
         json.dumps(asdict(expected_candidate), default=str, sort_keys=True)
     )
     for record in records:
+        if not re.fullmatch(r"[0-9a-f]{32}", record.run_id):
+            raise CascadeWorkflowError(f"{expected_role} component has an invalid run ID")
         if record.case_id not in expected:
             raise CascadeWorkflowError(
                 f"{expected_role} component contains unexpected case {record.case_id}"
@@ -204,6 +277,8 @@ def _load_measured_outputs(
             or record.model_role != expected_role
             or record.stage != "cascade"
             or record.backend != "kleidiai"
+            or record.repetition != 0
+            or record.route != expected_role
             or not record.cpu_only_verified
             or not record.kleidiai_verified
         ):
@@ -235,14 +310,17 @@ def _load_measured_outputs(
                 f"{expected_role} row {record.run_id} failed integrity: "
                 + "; ".join(integrity_errors)
             )
-        config_path = store.root / record.run_id / "run-config.json"
-        request_path = store.root / record.run_id / "request.json"
+        run_dir = store.root / record.run_id
         try:
-            run_config = json.loads(config_path.read_text(encoding="utf-8"))
-            request = json.loads(request_path.read_text(encoding="utf-8"))
+            run_config = json.loads((run_dir / "run-config.json").read_text(encoding="utf-8"))
+            request = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
+            response = json.loads((run_dir / "response.json").read_text(encoding="utf-8"))
+            runtime_log = (run_dir / "runtime-proof.txt").read_text(
+                encoding="utf-8", errors="replace"
+            )
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise CascadeWorkflowError(
-                f"{expected_role} row {record.run_id} has unreadable request provenance"
+                f"{expected_role} row {record.run_id} has unreadable nested provenance"
             ) from exc
         if not isinstance(run_config, dict) or run_config.get("candidate") != (
             expected_candidate_payload
@@ -255,25 +333,82 @@ def _load_measured_outputs(
                 f"{expected_role} row {record.run_id} dataset hashes disagree with the freeze"
             )
         if (
-            not isinstance(request, dict)
-            or request.get("case_id") != record.case_id
-            or request.get("model") != expected_candidate.candidate_id
-            or request.get("stream") is not True
+            run_config.get("prompt_sha256") != prompt_fingerprint()
+            or run_config.get("triage_schema") != triage_json_schema()
         ):
             raise CascadeWorkflowError(
-                f"{expected_role} row {record.run_id} request does not replay its record"
+                f"{expected_role} row {record.run_id} prompt/schema fingerprint does not replay"
             )
-        response_path = store.root / record.run_id / "response.json"
-        try:
-            response = json.loads(response_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        _verify_component_command(record, expected_candidate)
+        backend_proof = verify_backend_log(
+            runtime_log,
+            "kleidiai",
+            quantization=expected_candidate.quantization,
+            reviewed_model=reviewed_model,
+        )
+        cpu_proof = verify_cpu_only(
+            record.command,
+            cmake_cache=cmake_cache,
+            runtime_log=runtime_log,
+            require_device_none=True,
+        )
+        if not backend_proof.verified or not cpu_proof.verified:
             raise CascadeWorkflowError(
-                f"{expected_role} row {record.run_id} has no readable response"
-            ) from exc
+                f"{expected_role} row {record.run_id} runtime CPU/KleidiAI proof does not replay"
+            )
+        if (
+            record.kleidiai_verified is not backend_proof.verified
+            or record.cpu_only_verified is not cpu_proof.verified
+            or run_config.get("backend_proof") != backend_proof.to_dict()
+            or run_config.get("cpu_only_proof") != cpu_proof.to_dict()
+        ):
+            raise CascadeWorkflowError(
+                f"{expected_role} row {record.run_id} stored runtime proof disagrees with replay"
+            )
+        case = expected_cases[record.case_id]
+        expected_request = {
+            "case_id": record.case_id,
+            "repetition": 0,
+            "messages": build_messages(case.incident),
+            "model": expected_candidate.candidate_id,
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "max_tokens": REAL_BENCHMARK_MAX_TOKENS,
+            "seed": REAL_BENCHMARK_SEED,
+            "stream": True,
+            "response_format": triage_openai_response_format(),
+        }
+        if request != expected_request:
+            raise CascadeWorkflowError(
+                f"{expected_role} row {record.run_id} request does not match the frozen prompt"
+            )
         content = response.get("content") if isinstance(response, dict) else None
         if not isinstance(content, str):
             raise CascadeWorkflowError(
                 f"{expected_role} row {record.run_id} response content is not text"
+            )
+        replayed_score = score_case(case, content)
+        if (
+            replayed_score.schema_valid is not record.schema_valid
+            or abs(replayed_score.quality_score - record.quality_score) > 1e-6
+            or abs(replayed_score.safety_score - record.safety_score) > 1e-6
+            or list(replayed_score.issues) != record.errors
+            or response.get("score") != replayed_score.as_dict()
+        ):
+            raise CascadeWorkflowError(
+                f"{expected_role} row {record.run_id} response score does not replay"
+            )
+        timing = response.get("timing")
+        expected_timing = {
+            "start_ns": record.start_ns,
+            "first_content_token_ns": record.first_token_ns,
+            "end_ns": record.end_ns,
+            "ttft_ms": record.ttft_ms,
+            "e2e_ms": record.e2e_ms,
+        }
+        if timing != expected_timing:
+            raise CascadeWorkflowError(
+                f"{expected_role} row {record.run_id} response timing does not replay"
             )
         outputs[record.case_id] = content
         run_ids.append(record.run_id)
@@ -320,6 +455,7 @@ def collect_real_component_outputs(
         if split == "calibration"
         else tuple(benchmark.split.test)
     )
+    expected_cases = {case.case_id: case for case in benchmark.selected_cases(split)}
     weak_collection = None
     # The final-holdout input must not be replayed as a warmup before it is scored.  Calibration
     # can still use one representative warmup because it is explicitly the decision-making split.
@@ -344,6 +480,7 @@ def collect_real_component_outputs(
                 "cases_sha256": benchmark.cases_sha256,
                 "split_sha256": benchmark.split_sha256,
             },
+            expected_cases=expected_cases,
         )
     strong_candidate = _candidate(plan, role="strong", phase=phase)
     strong_records = run_candidate_sync(
@@ -364,6 +501,7 @@ def collect_real_component_outputs(
             "cases_sha256": benchmark.cases_sha256,
             "split_sha256": benchmark.split_sha256,
         },
+        expected_cases=expected_cases,
     )
     return CascadeComponentEvidence(
         session_dir=session_dir,
@@ -661,6 +799,20 @@ def _status_from_recorded_result(
     }
 
 
+def _held_out_reservation(frozen: dict[str, Any], policy: FrozenRoutingPolicy) -> dict[str, Any]:
+    return {
+        "status": "held-out-in-progress",
+        "reason": (
+            "held-out inference was reserved before its first request; absence of canonical "
+            "quality results must fail closed"
+        ),
+        "freeze_id": frozen["freeze_id"],
+        "policy_id": policy.policy_id,
+        "shipping_profile": "a3-strong-only",
+        "performance_claim_eligible": False,
+    }
+
+
 def preflight_held_out_evaluation(
     *,
     policy_path: Path | str = "artifacts/a4-frozen-policy.json",
@@ -709,12 +861,65 @@ def preflight_held_out_evaluation(
             raise CascadeWorkflowError("existing A4 status is unreadable") from exc
         if status == expected_status:
             return results, False
-        if not isinstance(status, dict) or status.get("status") != "not-run":
+        recoverable = isinstance(status, dict) and (
+            status.get("status") == "not-run" or status == _held_out_reservation(frozen, policy)
+        )
+        if not recoverable:
             raise CascadeWorkflowError(
                 "existing A4 status conflicts with canonical quality results; refusing recovery"
             )
     write_json(status_destination, expected_status)
     return results, True
+
+
+def reserve_held_out_evaluation(
+    *,
+    policy_path: Path | str = "artifacts/a4-frozen-policy.json",
+    cases_path: Path | str = "demo/cases.jsonl",
+    split_path: Path | str = "demo/split.json",
+    results_path: Path | str = "artifacts/quality-results.json",
+    status_path: Path | str = "artifacts/cascade-status.json",
+) -> dict[str, Any]:
+    """Atomically persist a fail-closed marker before the first held-out request."""
+
+    existing, _ = preflight_held_out_evaluation(
+        policy_path=policy_path,
+        cases_path=cases_path,
+        split_path=split_path,
+        results_path=results_path,
+        status_path=status_path,
+    )
+    if existing is not None:
+        raise CascadeWorkflowError("held-out policy has already been evaluated and recorded")
+    frozen, policy, _, _ = load_frozen_calibration(
+        policy_path,
+        cases_path=cases_path,
+        split_path=split_path,
+    )
+    results_destination = Path(results_path)
+    status_destination = Path(status_path)
+    if results_destination.exists():
+        raise CascadeWorkflowError(
+            "canonical A4 quality results appeared during reservation; refusing inference"
+        )
+    if status_destination.exists():
+        try:
+            current = json.loads(status_destination.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise CascadeWorkflowError("existing A4 status is unreadable") from exc
+        if not isinstance(current, dict) or current.get("status") != "not-run":
+            raise CascadeWorkflowError(
+                "A4 held-out inference is already reserved; refusing to collect again"
+            )
+    reservation = _held_out_reservation(frozen, policy)
+    write_json(status_destination, reservation)
+    try:
+        persisted = json.loads(status_destination.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise CascadeWorkflowError("A4 held-out reservation could not be verified") from exc
+    if persisted != reservation:
+        raise CascadeWorkflowError("A4 held-out reservation did not persist exactly")
+    return reservation
 
 
 def evaluate_held_out(
@@ -818,6 +1023,7 @@ def verify_cascade_evidence(
     cases = load_cases(cases_path)
     split = load_split(split_path)
     validate_dataset(cases, split)
+    by_id = {case.case_id: case for case in cases}
     expected_dataset = {
         "cases_sha256": stable_file_sha256(cases_path),
         "split_sha256": stable_file_sha256(split_path),
@@ -852,7 +1058,8 @@ def verify_cascade_evidence(
         for role in ("weak", "strong"):
             ids_value = source.get(f"{role}_run_ids", [])
             if not isinstance(ids_value, list) or not all(
-                isinstance(run_id, str) for run_id in ids_value
+                isinstance(run_id, str) and re.fullmatch(r"[0-9a-f]{32}", run_id)
+                for run_id in ids_value
             ):
                 errors.append(f"A4 {phase} {role} run IDs are invalid")
                 continue
@@ -890,6 +1097,7 @@ def verify_cascade_evidence(
                     expected_role=role,
                     expected_candidate=_candidate(plan, role=role, phase=phase),
                     expected_dataset=expected_dataset,
+                    expected_cases={case_id: by_id[case_id] for case_id in case_ids},
                 )
                 if list(loaded.source_run_ids) != ids_value:
                     errors.append(f"A4 {phase} {role} source run order does not replay")
@@ -923,7 +1131,6 @@ def verify_cascade_evidence(
         case_ids=tuple(split.test),
         require_weak=not policy.fallback_strong_only,
     )
-    by_id = {case.case_id: case for case in cases}
     if calibration_evidence is not None and calibration_evidence.weak is not None:
         try:
             threshold_grid = frozen.get("threshold_grid")
@@ -992,5 +1199,6 @@ __all__ = [
     "freeze_calibration",
     "load_frozen_calibration",
     "preflight_held_out_evaluation",
+    "reserve_held_out_evaluation",
     "verify_cascade_evidence",
 ]

@@ -51,6 +51,7 @@ class BenchmarkEnvironmentError(RuntimeError):
 
 
 REAL_BENCHMARK_MAX_TOKENS: Final[int] = BENCHMARK_MAX_OUTPUT_TOKENS
+REAL_BENCHMARK_SEED: Final[int] = 20260813
 
 
 def _wait_for_kleidiai_load_proof(
@@ -77,6 +78,35 @@ def _wait_for_kleidiai_load_proof(
         if proof.verified or time.monotonic() >= deadline:
             return log_text, proof
         time.sleep(min(interval_s, max(0.0, deadline - time.monotonic())))
+
+
+def _reviewed_model_proof(
+    candidate: RuntimeCandidate,
+    model_hash: str,
+) -> ModelInventoryProof:
+    """Bind a KleidiAI candidate's declared role to one exact reviewed artifact."""
+
+    matching_specs = [
+        spec
+        for spec in default_registry()
+        if spec.expected_sha256 == model_hash
+        and spec.expected_filename == candidate.model.name
+        and spec.quantization == candidate.quantization
+        and spec.role.value == candidate.model_role
+    ]
+    if len(matching_specs) != 1:
+        raise BenchmarkEnvironmentError(
+            "KleidiAI benchmark model is not the exact reviewed registry artifact for its "
+            f"declared {candidate.model_role} role"
+        )
+    reviewed_model = verify_model_inventory(
+        candidate.model,
+        matching_specs[0],
+        actual_sha256=model_hash,
+    )
+    if not reviewed_model.verified:
+        raise BenchmarkEnvironmentError("; ".join(reviewed_model.errors))
+    return reviewed_model
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +159,7 @@ class RealServiceBenchmark:
         build_manifest_path: Path | str = "artifacts/build-manifest.json",
         cases_path: Path | str = "demo/cases.jsonl",
         split_path: Path | str = "demo/split.json",
-        seed: int = 20260813,
+        seed: int = REAL_BENCHMARK_SEED,
         max_tokens: int = REAL_BENCHMARK_MAX_TOKENS,
         startup_timeout_s: float = 240.0,
     ) -> None:
@@ -193,24 +223,7 @@ class RealServiceBenchmark:
         model_hash = sha256_file(candidate.model)
         reviewed_model: ModelInventoryProof | None = None
         if candidate.backend == "kleidiai":
-            matching_specs = [
-                spec
-                for spec in default_registry()
-                if spec.expected_sha256 == model_hash
-                and spec.expected_filename == candidate.model.name
-                and spec.quantization == candidate.quantization
-            ]
-            if len(matching_specs) != 1:
-                raise BenchmarkEnvironmentError(
-                    "KleidiAI benchmark model is not the exact reviewed registry artifact"
-                )
-            reviewed_model = verify_model_inventory(
-                candidate.model,
-                matching_specs[0],
-                actual_sha256=model_hash,
-            )
-            if not reviewed_model.verified:
-                raise BenchmarkEnvironmentError("; ".join(reviewed_model.errors))
+            reviewed_model = _reviewed_model_proof(candidate, model_hash)
         cases = self.selected_cases(split, limit)
         if not cases:
             raise ValueError(f"no cases selected for split {split}")

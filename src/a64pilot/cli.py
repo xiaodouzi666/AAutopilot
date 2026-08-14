@@ -243,6 +243,7 @@ def benchmark_quality(
         freeze_calibration,
         load_frozen_calibration,
         preflight_held_out_evaluation,
+        reserve_held_out_evaluation,
     )
 
     try:
@@ -317,6 +318,12 @@ def benchmark_quality(
             )
             return
         frozen_payload, routing_policy, runtime, _ = load_frozen_calibration(policy)
+        reserve_held_out_evaluation(
+            policy_path=policy,
+            cases_path=cases_path,
+            split_path=split_path,
+            results_path=results,
+        )
         evidence = collect_real_component_outputs(
             runtime,
             split="test",

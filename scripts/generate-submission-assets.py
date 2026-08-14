@@ -762,6 +762,20 @@ def _captions(root: Path) -> str:
     cascade = _require_mapping(
         _read_json(root / "artifacts" / "cascade-status.json"), label="cascade status"
     )
+    profile_id = profile.get("profile_id")
+    cascade_status = cascade.get("status")
+    shipping_profile = cascade.get("shipping_profile") or cascade.get("shipping_fallback")
+    if not isinstance(profile_id, str) or not profile_id.strip():
+        raise SubmissionAssetError("captions require a non-empty optimized profile ID")
+    if not isinstance(cascade_status, str) or not cascade_status.strip():
+        raise SubmissionAssetError("captions require a non-empty A4 cascade status")
+    if not isinstance(shipping_profile, str) or not shipping_profile.strip():
+        raise SubmissionAssetError(
+            "captions require a non-empty shipping_profile or shipping_fallback"
+        )
+    profile_id = profile_id.strip()
+    cascade_status = cascade_status.strip()
+    shipping_profile = shipping_profile.strip()
     primary_ci = primary["confidence_interval"]
     p95_ci = p95["confidence_interval"]
     return f"""# Submission Screenshot Captions
@@ -793,9 +807,9 @@ reported transparently and does not unlock publication.
 ## 4. Validated API and deployed-profile status
 
 **Caption:** The submitted API serves the measured **strong-only** profile
-`{profile.get("profile_id")}` and enforces the benchmark's strict triage schema, read-only tool
-policy, and fail-closed HTTP 502 behavior. A4 routing is **{cascade.get("status")}**; the shipping
-fallback is `{cascade.get("shipping_fallback")}`, so no unmeasured cascade claim is made.
+`{profile_id}` and enforces the benchmark's strict triage schema, read-only tool policy, and
+fail-closed HTTP 502 behavior. A4 routing is **{cascade_status}**; the shipping profile is
+`{shipping_profile}`, so no unmeasured cascade claim is made.
 """
 
 
